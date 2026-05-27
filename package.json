@@ -1,0 +1,18 @@
+{
+  "name": "textile-designer-demo-videos",
+  "version": "1.0.0",
+  "description": "Automated demo-video recorder for textile-designer.ai tools (Playwright + ffmpeg).",
+  "type": "module",
+  "scripts": {
+    "runner": "node runner.mjs",
+    "login": "node login-once.mjs",
+    "postinstall": "playwright install chromium"
+  },
+  "keywords": ["demo", "video", "playwright", "textile-designer"],
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "ffmpeg-static": "^5.2.0",
+    "testreel": "^0.2.0"
+  }
+}

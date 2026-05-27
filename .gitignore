@@ -1,0 +1,9 @@
+node_modules/
+# Logged-in Chrome profiles — contain your session/cookies. NEVER commit.
+.profile/
+.profile-prod/
+.profile*/
+# Generated videos/screenshots and uploaded inputs
+output/
+assets/uploads/
+*.log

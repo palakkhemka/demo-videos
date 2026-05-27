@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <rect width="240" height="240" fill="#f4ece0"/>
+  <!-- center motif -->
+  <g fill="none" stroke="#1f3a5f" stroke-width="6" stroke-linecap="round">
+    <circle cx="120" cy="120" r="46"/>
+    <path d="M120 60 q24 36 0 60 q-24 -24 0 -60 Z" fill="#c0563b" stroke="none"/>
+    <path d="M120 180 q24 -36 0 -60 q-24 24 0 60 Z" fill="#c0563b" stroke="none"/>
+    <path d="M60 120 q36 24 60 0 q-24 -24 -60 0 Z" fill="#3f7d54" stroke="none"/>
+    <path d="M180 120 q-36 24 -60 0 q24 -24 60 0 Z" fill="#3f7d54" stroke="none"/>
+  </g>
+  <circle cx="120" cy="120" r="14" fill="#e0a23b"/>
+  <!-- corner accents (tile seamlessly: each corner is a quarter dot) -->
+  <g fill="#1f3a5f">
+    <circle cx="0" cy="0" r="18"/>
+    <circle cx="240" cy="0" r="18"/>
+    <circle cx="0" cy="240" r="18"/>
+    <circle cx="240" cy="240" r="18"/>
+  </g>
+  <!-- mid-edge accents (tile seamlessly across edges) -->
+  <g fill="#e0a23b">
+    <circle cx="120" cy="0" r="9"/>
+    <circle cx="120" cy="240" r="9"/>
+    <circle cx="0" cy="120" r="9"/>
+    <circle cx="240" cy="120" r="9"/>
+  </g>
+</svg>
