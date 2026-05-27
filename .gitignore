@@ -5,5 +5,8 @@ node_modules/
 .profile*/
 # Generated videos/screenshots and uploaded inputs
 output/
-assets/uploads/
 *.log
+# Only the brand logos are tracked; sample/user inputs are not.
+assets/*
+!assets/logo-main.png
+!assets/logo-scientia.png

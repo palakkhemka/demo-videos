@@ -147,7 +147,7 @@ async function main() {
       await page.evaluate(() => document.getElementById('tr-picker')?.remove())
       await page.locator('#fileInput').setInputFiles(file).catch(() => {})
     }
-    const tile = async (file, label, color, fileName) => {
+    const tile = async (file, label, color, fileName, cycle = false) => {
       await page.goto(`${BASE_URL}/tools/repeat_checker`, { waitUntil: 'domcontentloaded' })
       await page.waitForSelector('#fileInput', { state: 'attached', timeout: 30000 })
       await page.getByRole('button', { name: /^Accept$/ }).click({ timeout: 3000 }).catch(() => {})
@@ -157,6 +157,14 @@ async function main() {
       const grid = page.locator('input[type="range"]').first()
       const gb = await grid.boundingBox().catch(() => null)
       if (gb) { await page.mouse.click(gb.x + gb.width * 0.66, gb.y + gb.height / 2); await sleep(900) }
+      // For the raw input: show it tiled in every repeat type (seams in each).
+      if (cycle) {
+        for (const [val, name] of [['full', 'Full'], ['half-brick', 'Half Brick'], ['half-drop', 'Half Drop']]) {
+          await banner(`Original in ${name} repeat - seams`, color)
+          await glide(page.locator(`input[name="patternType"][value="${val}"]`)).catch(() => {})
+          await sleep(1400)
+        }
+      }
       await glide(page.getByRole('button', { name: /enlarge preview/i }))
       await sleep(800)
       await glide(page.getByRole('button', { name: /zoom in/i }))
@@ -167,7 +175,7 @@ async function main() {
       await sleep(400)
     }
     try {
-      await tile(INPUT, "Original - seams don't line up", '#b4453c', 'design.png')
+      await tile(INPUT, 'Original - seams in every repeat', '#b4453c', 'design.png', true)
       for (let i = 0; i < downloads.slice(0, 3).length; i++) {
         const fn = (TYPES[i]?.label || 'repeat').toLowerCase().replace(/ /g, '_') + '_output.png'
         await tile(downloads[i], `${TYPES[i]?.label || 'Repeat Set'} - seamless`, '#2f7d54', fn)
