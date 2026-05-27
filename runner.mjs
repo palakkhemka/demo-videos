@@ -124,7 +124,8 @@ function thumbFor(absMp4) {
 }
 
 const SCRIPT_NAMES = {
-  'record-bg-remove2.mjs': 'Background Removal',
+  'record-bg-remove2.mjs': 'Background Removal · Model 1',
+  'record-bg-remove-model2.mjs': 'Background Removal · Model 2',
   'record-bg-remove.mjs': 'Background Removal (standalone)',
   'record-anti-blur-pro.mjs': 'Anti-Blur · Pro',
   'record-anti-blur-legacy.mjs': 'Anti-Blur · Legacy',
@@ -205,98 +206,159 @@ function serveFile(res, file, type) {
   })
 }
 
-const HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Demo Runner · Textile Designer AI</title>
+const HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Demo Studio · Textile Designer AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0d1b2a;--card:#15293f;--ink:#e8eef4;--mut:#9fb3c8;--acc:#3f7d54;--acc2:#2f6fed}
-  *{box-sizing:border-box} body{margin:0;font:15px/1.5 Segoe UI,system-ui,sans-serif;background:linear-gradient(135deg,#0d1b2a,#13392c);color:var(--ink)}
-  .wrap{max-width:1080px;margin:0 auto;padding:28px}
-  h1{font-size:22px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 22px}
-  .card{background:var(--card);border:1px solid #21405e;border-radius:14px;padding:18px;margin-bottom:18px}
+  :root{
+    --ink:#0c0e12;--panel:#11141b;--card:#161a22;--card2:#1b2029;
+    --line:#262d39;--line2:#333c4b;--fg:#eef1f5;--mut:#8b95a4;
+    --acc:#5bd6a0;--acc-d:#2f7d54;--clay:#e2a06a;
+    --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+    --shadow:0 14px 44px rgba(0,0,0,.42);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;color:var(--fg);background:var(--ink);
+    font:15px/1.55 'Hanken Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(900px 600px at 12% -8%,rgba(91,214,160,.10),transparent 60%),
+      radial-gradient(800px 600px at 100% 0%,rgba(226,160,106,.08),transparent 55%),
+      radial-gradient(700px 700px at 80% 110%,rgba(47,125,84,.10),transparent 60%);
+    background-attachment:fixed}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E")}
+  .app{position:relative;z-index:1;display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+  /* sidebar */
+  .rail{position:sticky;top:0;align-self:start;height:100vh;display:flex;flex-direction:column;gap:6px;
+    padding:22px 16px;background:linear-gradient(180deg,rgba(18,21,28,.9),rgba(12,14,18,.9));
+    border-right:1px solid var(--line);backdrop-filter:blur(6px)}
+  .brand{display:flex;align-items:center;gap:11px;padding:6px 8px 18px}
+  .brand img{width:38px;height:38px;border-radius:9px;object-fit:cover;box-shadow:0 3px 12px rgba(0,0,0,.5)}
+  .brand .wm{font-family:'Fraunces',serif;font-weight:600;font-size:20px;letter-spacing:.2px;line-height:1.05}
+  .brand .wm small{display:block;font-family:'Hanken Grotesk';font-weight:500;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);margin-top:3px}
+  .nav{display:flex;align-items:center;gap:11px;width:100%;text-align:left;cursor:pointer;
+    background:transparent;color:var(--mut);border:1px solid transparent;border-radius:11px;
+    padding:11px 13px;font-size:14.5px;font-weight:600;transition:.15s}
+  .nav .ic{font-size:16px;width:20px;text-align:center}
+  .nav:hover{color:var(--fg);background:rgba(255,255,255,.03)}
+  .nav.on{color:var(--ink);background:linear-gradient(180deg,var(--acc),#46c08c);border-color:transparent;box-shadow:0 6px 18px rgba(91,214,160,.22)}
+  .rail-foot{margin-top:auto;padding-top:16px;border-top:1px solid var(--line)}
+  .rail-foot .lab{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--mut);margin:0 0 7px 2px}
+  /* main */
+  .stage{padding:34px 40px 60px;max-width:1180px}
+  .stage>*{animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+  .stage>*:nth-child(2){animation-delay:.05s}.stage>*:nth-child(3){animation-delay:.1s}
+  .stage>*:nth-child(4){animation-delay:.15s}.stage>*:nth-child(5){animation-delay:.2s}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .head{margin:0 0 26px}
+  .head h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:.2px;margin:0}
+  .head .sub{color:var(--mut);margin:5px 0 0;font-size:14px}
+  .sub{color:var(--mut)}
+  /* card */
+  .card{position:relative;background:linear-gradient(180deg,var(--card),var(--ink));
+    border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card>label,.card>.clabel{display:block;font-family:'Fraunces',serif;font-weight:600;font-size:15.5px;letter-spacing:.2px;margin-bottom:11px;color:var(--fg)}
   label{display:block;font-weight:600;margin-bottom:8px}
-  select,button,input,textarea{font:inherit}
-  select{width:100%;padding:10px;border-radius:9px;background:#0d1b2a;color:var(--ink);border:1px solid #2a4a68}
-  input[type=text],input[type=number]{width:100%;padding:9px 10px;border-radius:9px;background:#0d1b2a;color:var(--ink);border:1px solid #2a4a68;margin-bottom:8px}
+  /* controls */
+  select,button,input,textarea{font:inherit;color:var(--fg)}
+  select{width:100%;padding:11px 12px;border-radius:11px;background:var(--card2);color:var(--fg);border:1px solid var(--line2);cursor:pointer}
+  select:focus,input:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(91,214,160,.14)}
+  input[type=text],input[type=number],textarea{width:100%;padding:10px 12px;border-radius:11px;background:var(--card2);color:var(--fg);border:1px solid var(--line2);margin-bottom:8px}
+  textarea{resize:vertical;font:inherit}
   .field{margin-bottom:10px} .field:last-child{margin-bottom:0}
   .field .lab{font-weight:500;color:var(--mut);font-size:12px;margin-bottom:4px}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .inline{display:flex;align-items:center;gap:8px;margin:0}.inline input{width:90px;margin:0}
-  .imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin-top:6px}
-  .thumb{position:relative;border:2px solid transparent;border-radius:10px;overflow:hidden;cursor:pointer;background:#0d1b2a}
-  .thumb img{width:100%;height:96px;object-fit:cover;display:block}
-  .thumb.sel{border-color:var(--acc2)} .thumb .nm{font-size:11px;color:var(--mut);padding:4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .thumb .ck{position:absolute;top:6px;left:6px;width:20px;height:20px;border-radius:50%;background:#0008;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px}
   .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  button.run{background:var(--acc2);color:#fff;border:0;padding:12px 26px;border-radius:10px;font-weight:600;cursor:pointer}
-  button.run:disabled{opacity:.5;cursor:default}
-  .ghost{background:#0d1b2a;color:var(--ink);border:1px solid #2a4a68;padding:9px 14px;border-radius:9px;cursor:pointer}
-  pre{background:#06101b;border:1px solid #21405e;border-radius:10px;padding:14px;max-height:320px;overflow:auto;font:12px/1.5 ui-monospace,Consolas,monospace;color:#bcd6c8;white-space:pre-wrap}
-  .results a{display:inline-block;margin:6px 10px 0 0;color:#9fd3b1}
+  /* image select grid (run inputs) */
+  .imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:12px;margin-top:12px}
+  .thumb{position:relative;border:2px solid var(--line2);border-radius:12px;overflow:hidden;cursor:pointer;background:var(--card2);transition:.14s}
+  .thumb:hover{transform:translateY(-2px);border-color:var(--acc)}
+  .thumb img{width:100%;height:96px;object-fit:cover;display:block}
+  .thumb.sel{border-color:var(--acc);box-shadow:0 0 0 3px rgba(91,214,160,.2)}
+  .thumb .nm{font:11px var(--mono);color:var(--mut);padding:5px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .thumb .ck{position:absolute;top:7px;left:7px;width:22px;height:22px;border-radius:50%;background:#000a;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px;opacity:0;transition:.12s}
+  .thumb.sel .ck{opacity:1;background:var(--acc);color:var(--ink);border-color:var(--acc)}
+  /* buttons */
+  button.run{background:linear-gradient(180deg,var(--acc),#42bd87);color:#06231a;border:0;padding:12px 28px;border-radius:12px;font-weight:700;font-size:14.5px;cursor:pointer;box-shadow:0 8px 22px rgba(91,214,160,.25);transition:.15s}
+  button.run:hover{filter:brightness(1.06);transform:translateY(-1px)}
+  button.run:disabled{opacity:.45;cursor:default;box-shadow:none;transform:none;filter:none}
+  .ghost{background:var(--card2);color:var(--fg);border:1px solid var(--line2);padding:9px 15px;border-radius:11px;cursor:pointer;font-weight:600;transition:.14s}
+  .ghost:hover{border-color:var(--acc);color:var(--fg)}
+  pre{background:#080a0e;border:1px solid var(--line);border-radius:12px;padding:15px;max-height:340px;overflow:auto;font:12px/1.55 var(--mono);color:#a9e7c8;white-space:pre-wrap}
+  .results{margin-top:12px;display:flex;flex-wrap:wrap}
+  .results a{display:inline-flex;align-items:center;gap:5px;margin:6px 10px 0 0;color:var(--acc);text-decoration:none;font-weight:600;font-size:13px}
+  .results a:hover{text-decoration:underline}
   input[type=file]{display:none}
-  .tabs{display:flex;gap:8px;margin-bottom:18px}
-  .tab{background:#0d1b2a;color:var(--mut);border:1px solid #2a4a68;padding:9px 18px;border-radius:9px;cursor:pointer;font-weight:600}
-  .tab.on{background:var(--acc2);color:#fff;border-color:var(--acc2)}
-  .crumb{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:16px;font-size:14px}
-  .crumb a{color:#9fd3b1;cursor:pointer;text-decoration:none}
+  /* breadcrumb + browser */
+  .crumb{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:14px}
+  .crumb a{color:var(--acc);cursor:pointer;text-decoration:none;font-weight:600}
   .crumb a:hover{text-decoration:underline}
   .crumb .sep{color:var(--mut)}
-  .crumb .here{color:var(--ink);font-weight:600}
-  .browse{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
-  .tile{position:relative;background:#0d1b2a;border:1px solid #21405e;border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .12s,transform .12s}
-  .tile:hover{border-color:var(--acc2);transform:translateY(-2px)}
-  .tile .pv{position:relative;height:140px;background:#06101b;display:flex;align-items:center;justify-content:center}
+  .crumb .here{color:var(--fg);font-family:var(--mono);font-size:13px}
+  .browse{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:16px}
+  .tile{position:relative;background:linear-gradient(180deg,var(--card),var(--ink));border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer;transition:.14s}
+  .tile:hover{border-color:var(--acc);transform:translateY(-3px);box-shadow:var(--shadow)}
+  .tile .pv{position:relative;height:142px;background:#080a0e;display:flex;align-items:center;justify-content:center}
   .tile .pv img{width:100%;height:100%;object-fit:cover;display:block}
-  .tile.folder .pv .fic{font-size:56px;line-height:1;filter:drop-shadow(0 4px 8px #0008)}
-  .tile .badge{position:absolute;left:8px;bottom:8px;background:#000b;border-radius:6px;font-size:11px;padding:2px 7px;color:#fff}
-  .tile .play{position:absolute;top:0;left:0;right:0;height:140px;display:flex;align-items:center;justify-content:center;font-size:34px;color:#fff;text-shadow:0 2px 10px #000;opacity:.8;pointer-events:none}
-  .tile:hover .play{opacity:1}
-  .tile .cap{padding:9px 10px 2px;font:12px/1.4 ui-monospace,Consolas,monospace;color:#cfe3d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .tile .sub2{padding:0 10px 9px;color:var(--mut);font-size:11px}
-  .empty{color:var(--mut);padding:18px 0}
-</style></head><body><div class="wrap">
-  <h1>Demo Runner</h1><p class="sub">Pick a script, choose input image(s), run each one-by-one.</p>
-  <div class="tabs"><button class="tab on" id="tabRun">Run</button><button class="tab" id="tabHist">History</button></div>
+  .tile.folder .pv{background:radial-gradient(120px 80px at 50% 38%,rgba(226,160,106,.16),transparent 70%)}
+  .tile.folder .pv .fic{font-size:58px;line-height:1;filter:drop-shadow(0 5px 10px #0009)}
+  .tile .badge{position:absolute;left:9px;bottom:9px;background:#000c;border:1px solid var(--line2);border-radius:7px;font:11px var(--mono);padding:2px 8px;color:#fff}
+  .tile .play{position:absolute;top:0;left:0;right:0;height:142px;display:flex;align-items:center;justify-content:center;font-size:36px;color:#fff;text-shadow:0 2px 12px #000;opacity:.85;pointer-events:none;transition:.14s}
+  .tile:hover .play{opacity:1;transform:scale(1.08)}
+  .tile .cap{padding:10px 11px 2px;font:12px var(--mono);color:#dbe6df;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile .sub2{padding:0 11px 10px;color:var(--mut);font-size:11px}
+  .empty{color:var(--mut);padding:24px 0}
+</style></head><body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><img src="/file/assets/logo-main.png" alt=""><div class="wm">Demo Studio<small>Textile Designer AI</small></div></div>
+    <button class="nav on" id="tabRun"><span class="ic">⦿</span> Record</button>
+    <button class="nav" id="tabHist"><span class="ic">▦</span> Library</button>
+    <div class="rail-foot">
+      <div class="lab">Target site</div>
+      <select id="site">
+        <option value="prod" selected>Production · textile-designer.ai</option>
+        <option value="dev">Local dev · localhost:3000</option>
+      </select>
+    </div>
+  </aside>
+  <main class="stage">
   <div id="runView">
-  <div class="card">
-    <label>Target site</label>
-    <select id="site">
-      <option value="prod" selected>Production - textile-designer.ai (.profile-prod)</option>
-      <option value="dev">Local dev - localhost:3000 (.profile)</option>
-    </select>
-  </div>
-  <div class="card"><label>Script</label><select id="script"></select></div>
-  <div class="card">
-    <div class="row" style="justify-content:space-between">
-      <label style="margin:0">Input images <span class="sub" id="selcount"></span></label>
-      <button class="ghost" id="addBtn">+ Upload images</button>
-      <input type="file" id="file" accept="image/*" multiple>
+    <div class="head"><h1>Record a demo</h1><p class="sub">Pick a tool, choose input image(s), and capture a branded demo - run on each one by one.</p></div>
+    <div class="card"><label>Tool</label><select id="script"></select></div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <label style="margin:0">Input images <span class="sub" id="selcount"></span></label>
+        <div class="row" style="gap:8px"><button class="ghost" id="urlBtn">Fetch URLs</button><button class="ghost" id="addBtn">+ Upload</button></div>
+        <input type="file" id="file" accept="image/*" multiple>
+      </div>
+      <textarea id="urls" placeholder="Paste image URL(s), one per line" style="margin-top:10px"></textarea>
+      <div class="imgs" id="imgs"></div>
     </div>
-    <div class="row" style="margin-top:10px;align-items:flex-start">
-      <textarea id="urls" placeholder="Paste image URL(s), one per line" style="flex:1;min-height:54px;padding:9px;border-radius:9px;background:#0d1b2a;color:var(--ink);border:1px solid #2a4a68;font:inherit;resize:vertical"></textarea>
-      <button class="ghost" id="urlBtn">Fetch URLs</button>
+    <div class="card">
+      <label>Target image <span class="sub">(color_transfer only)</span></label>
+      <select id="target"></select>
     </div>
-    <div class="imgs" id="imgs"></div>
-  </div>
-  <div class="card">
-    <label>Target image <span class="sub">(color_transfer only)</span></label>
-    <select id="target"></select>
-  </div>
-  <div class="card">
-    <div class="row">
-      <label style="margin:0"><input type="checkbox" id="headless"> headless (no window)</label>
-      <button class="run" id="run">Run on selected images</button>
-      <span id="status" class="sub"></span>
+    <div class="card">
+      <div class="row">
+        <label style="margin:0"><input type="checkbox" id="headless"> headless (no window)</label>
+        <button class="run" id="run">Run on selected images</button>
+        <span id="status" class="sub"></span>
+      </div>
+      <pre id="log" style="margin-top:14px;display:none"></pre>
+      <div class="results" id="results"></div>
     </div>
-    <pre id="log" style="margin-top:14px;display:none"></pre>
-    <div class="results" id="results"></div>
-  </div>
   </div>
   <div id="historyView" style="display:none">
-    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+    <div class="head"><h1>Library</h1><p class="sub">Every run, foldered by tool. Open a tool for all its videos, or switch to the nested folder view.</p></div>
+    <div class="row" style="justify-content:space-between;margin-bottom:14px">
       <div id="crumb" class="crumb"></div>
       <div class="row" style="gap:8px"><button class="ghost" id="histMode"></button><button class="ghost" id="histRefresh">Refresh</button></div>
     </div>
     <div id="hist"></div>
   </div>
+  </main>
+</div>
 <script>
 const $=s=>document.querySelector(s); let images=[]; const sel=new Set();
 async function load(){
@@ -396,7 +458,7 @@ async function browse(p,mode){
   document.querySelectorAll('#hist .tile[data-open]').forEach(t=>t.onclick=()=>fetch('/api/open?p='+t.dataset.open));
 }
 load();
-</script></div></body></html>`
+</script></body></html>`
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`)

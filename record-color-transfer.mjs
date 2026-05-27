@@ -25,6 +25,11 @@ async function main() {
   let submitMs = 0, resultMs = 0
 
   try {
+    // Dismiss the real OS chooser (empty) BEFORE any upload click so the FAKE
+    // picker shows first; the real image is set later via fakeUpload's
+    // setInputFiles. Register once, up front (a click can fire it immediately).
+    page.on('filechooser', (c) => c.setFiles([]).catch(() => {}))
+
     await page.goto(`${BASE_URL}/ai?tab=home`, { waitUntil: 'domcontentloaded' })
     const nav = page.locator('button[class*="tool-row"]').filter({ hasText: /color transfer/i }).first()
     console.log('[color_transfer] waiting for home (log in if prompted)...')
@@ -32,28 +37,44 @@ async function main() {
     await sleep(1000)
     await glide(nav, { force: true }).catch(() => {})
 
-    // The tab has two upload buttons; the first/second file inputs back them.
-    const uploadBtns = page.getByRole('button', { name: /upload/i })
-    try { await uploadBtns.first().waitFor({ state: 'visible', timeout: 18000 }) }
-    catch { await page.goto(`${BASE_URL}/ai?tab=color_transfer`, { waitUntil: 'domcontentloaded' }); await uploadBtns.first().waitFor({ state: 'visible', timeout: 30000 }) }
-    await sleep(800)
-    page.on('filechooser', (c) => c.setFiles([]).catch(() => {}))
+    // The color_transfer surface is the only tab that mounts the #source and
+    // #target file inputs (DoubleImageUploadSection + ColorTransferFileInputs).
+    // They are class="hidden", so wait for ATTACHED, not visible - this is the
+    // definitive "the tool loaded" signal (the old code waited on a generic
+    // /upload/i button that never matched before the tab had switched).
+    const sourceInput = page.locator('input#source').first()
+    try { await sourceInput.waitFor({ state: 'attached', timeout: 18000 }) }
+    catch {
+      console.log('[color_transfer] nav click did not switch tabs - navigating to ?tab=color_transfer')
+      await page.goto(`${BASE_URL}/ai?tab=color_transfer`, { waitUntil: 'domcontentloaded' })
+      await sourceInput.waitFor({ state: 'attached', timeout: 30000 })
+    }
+    await sleep(900)
 
-    // Source design
-    await glide(uploadBtns.nth(0)).catch(() => {})
+    // Source design. Click the labelled Source upload button for the on-screen
+    // cursor, then drive the real upload through the stable #source input id.
+    // (The label is "Upload Source Image"; the control panel upper-cases it.)
+    const sourceUploadBtn = page.getByRole('button', { name: /upload source/i }).first()
+    await glide(sourceUploadBtn, { force: true }).catch(() => {})
     await sleep(300)
-    await fakeUpload(SOURCE, 'input[type="file"] >> nth=0')
+    await fakeUpload(SOURCE, 'input#source')
     await sleep(1800)
-    await zoomEl(['canvas'])
+    await zoomEl(['#sourceCanvas', 'canvas'])
 
-    // Target color reference
-    await glide(uploadBtns.nth(1)).catch(() => {})
+    // Target color reference (label "Upload Target Design"), via #target input.
+    const targetUploadBtn = page.getByRole('button', { name: /upload target/i }).first()
+    await glide(targetUploadBtn, { force: true }).catch(() => {})
     await sleep(300)
-    await fakeUpload(TARGET, 'input[type="file"] >> nth=1')
+    await fakeUpload(TARGET, 'input#target')
     await sleep(1800)
-    await zoomEl(['canvas'])
+    await zoomEl(['#targetCanvas', 'canvas'])
 
+    // Wait for Submit to enable (the upload may crop/process first), then submit.
     const submit = page.getByRole('button', { name: /^submit$/i })
+    await page.waitForFunction(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /^submit$/i.test((x.textContent || '').trim()))
+      return b && !b.disabled
+    }, { timeout: 90000 }).catch(() => {})
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('/api/sqs/send-task-message'), { timeout: 30000 }).catch(() => null),
       glide(submit),
