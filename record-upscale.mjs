@@ -1,4 +1,4 @@
-// Upscale ("Ready to Print") demo — single video:
+// Upscale ("Ready to Print") demo - single video:
 //   upload -> zoom input -> ADVANCED mode -> run 2x (controls, before/after, zoom)
 //   -> run 4x -> side-by-side 2x vs 4x comparison.
 // Needs the upscale worker (machine1 upscale_md / machine2 upscale_sd) on DEV.
@@ -89,7 +89,7 @@ async function main() {
       await page.evaluate(({ a, b }) => {
         const ov = document.createElement('div'); ov.id = 'tr-cmp'
         ov.style.cssText = 'position:fixed;inset:0;z-index:2147483500;background:rgba(13,27,42,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:Segoe UI,system-ui,sans-serif;color:#e8eef4'
-        ov.innerHTML = '<div style="font-size:28px;font-weight:700">2× vs 4× — Ready to Print</div>' +
+        ov.innerHTML = '<div style="font-size:28px;font-weight:700">2× vs 4× - Ready to Print</div>' +
           '<div style="display:flex;gap:30px">' +
           '<div style="text-align:center"><img src="' + a + '" style="width:420px;height:420px;object-fit:cover;border-radius:12px;box-shadow:0 10px 40px #000"/><div style="margin-top:10px;font-size:20px;font-weight:600">2×</div></div>' +
           '<div style="text-align:center"><img src="' + b + '" style="width:420px;height:420px;object-fit:cover;border-radius:12px;box-shadow:0 10px 40px #000"/><div style="margin-top:10px;font-size:20px;font-weight:600">4×</div></div>' +
@@ -111,7 +111,7 @@ async function main() {
     outName: 'upscale-demo',
     titleUrl: 'textile-designer.ai/ai?tab=upscale',
     displayName: 'Ready to Print',
-    caption: 'Low-res art too small to print — print-ready in seconds',
+    caption: 'Low-res art too small to print - print-ready in seconds',
     viewport, t0, spans,
   })
 }

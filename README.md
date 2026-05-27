@@ -1,9 +1,9 @@
-# Textile Designer — Demo Video Recorder
+# Textile Designer - Demo Video Recorder
 
 Automated, branded demo videos of the [textile-designer.ai](https://textile-designer.ai)
 tools. Drives the real app in Chrome (Playwright), records the screen, and frames
 each clip with a macOS-style titlebar, animated cursor, a simulated file picker, a
-problem→claim caption, intro/outro cards, and a sped-up "processing" beat — then
+problem→claim caption, intro/outro cards, and a sped-up "processing" beat - then
 exports social aspect-ratio cuts (9:16 / 1:1 / 16:9).
 
 ## Requirements
@@ -31,7 +31,7 @@ required). Use an account with credits/unlimited.
 ```
 
 Log in, reach `/ai`, then **fully close** that Chrome window (it locks the profile).
-`.profile*` are git-ignored — never commit them (they hold your session).
+`.profile*` are git-ignored - never commit them (they hold your session).
 
 ## Usage
 

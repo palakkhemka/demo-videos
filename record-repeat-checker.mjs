@@ -1,5 +1,5 @@
 // Demo recording: Seamless Repeat Checker (public /tools/repeat_checker page).
-// Smoke test for the testreel pipeline — no auth, no worker, no credits.
+// Smoke test for the testreel pipeline - no auth, no worker, no credits.
 //
 // Usage (from demo/):
 //   node record-repeat-checker.mjs
@@ -80,7 +80,7 @@ async function main() {
     await recorder.click('button[aria-label="Zoom in"]')
     await recorder.wait(700)
 
-    // Pan the zoomed canvas (drag) — recorder has no drag, drive the mouse directly.
+    // Pan the zoomed canvas (drag) - recorder has no drag, drive the mouse directly.
     const cx = VIEWPORT.width / 2
     const cy = VIEWPORT.height / 2
     await page.mouse.move(cx, cy)

@@ -10,7 +10,7 @@ recordTool({
   navLabel: /dress to design/i,
   outName: 'dress-to-design-fine-demo',
   displayName: 'Dress to Design · Fine Detail',
-  caption: 'Tracing flats from garment photos — extracted in seconds',
+  caption: 'Tracing flats from garment photos - extracted in seconds',
   input: 'assets/dress.jpg',
   doSlider: false,
   zoomInput: true,

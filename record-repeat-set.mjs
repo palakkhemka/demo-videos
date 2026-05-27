@@ -1,4 +1,4 @@
-// Repeat Set demo — two clips stitched into one video:
+// Repeat Set demo - two clips stitched into one video:
 //   CLIP 1 (logged in): Repeat Set tab -> upload -> Full/Half Brick/Half Drop,
 //           capture each seamless output.
 //   CLIP 2 (logged out): /tools/repeat_checker (public, no sidebar/redirect) ->
@@ -55,7 +55,9 @@ async function main() {
   const clip1 = path.join(dir, 'clip1.webm')
   const clip2 = path.join(dir, 'clip2.webm')
   const spans = []
-  const downloads = []
+  let downloads = []
+  // Clear stale outputs from previous runs (different inputs) so we never mix images.
+  fs.rmSync(path.join(dir, 'downloads'), { recursive: true, force: true })
 
   // ---------- CLIP 1: Repeat Set (logged in) ----------
   {
@@ -99,9 +101,8 @@ async function main() {
         await glide(downloadBtn.first()).catch(() => {})
         await sleep(1500)
       }
-      // capture the downloads saved by the session handler
-      const dl = path.join(dir, 'downloads')
-      if (fs.existsSync(dl)) downloads.push(...fs.readdirSync(dl).map((f) => path.join(dl, f)))
+      // Only THIS run's captured outputs (in submit order: Full, Half Brick, Half Drop).
+      downloads = s.downloads.slice()
     } finally {
       await ctx.close().catch(() => {})
     }
@@ -166,10 +167,10 @@ async function main() {
       await sleep(400)
     }
     try {
-      await tile(INPUT, "Original — seams don't line up", '#b4453c', 'design.png')
+      await tile(INPUT, "Original - seams don't line up", '#b4453c', 'design.png')
       for (let i = 0; i < downloads.slice(0, 3).length; i++) {
         const fn = (TYPES[i]?.label || 'repeat').toLowerCase().replace(/ /g, '_') + '_output.png'
-        await tile(downloads[i], `${TYPES[i]?.label || 'Repeat Set'} — seamless`, '#2f7d54', fn)
+        await tile(downloads[i], `${TYPES[i]?.label || 'Repeat Set'} - seamless`, '#2f7d54', fn)
       }
     } finally {
       await ctx.close().catch(() => {}); await browser.close().catch(() => {})
@@ -221,8 +222,8 @@ function stitch(dir, clip1, clip2, spans) {
   const f1 = path.join(dir, 'f1.mp4'), f2 = path.join(dir, 'f2.mp4'), intro = path.join(dir, 'intro.mp4'), outro = path.join(dir, 'outro.mp4'), mp4 = path.join(dir, 'repeat-set-demo.mp4')
   const parts = []
   if (card(intro, 3, 'Textile Designer AI', 'Repeat Set', 70).status === 0) parts.push(intro)
-  if (frame(clip1, f1, spans, 'Hours making seamless repeats — tiled in seconds')) parts.push(f1)
-  if (frame(clip2, f2, [], 'Proof — it tiles seamlessly')) parts.push(f2)
+  if (frame(clip1, f1, spans, 'Hours making seamless repeats - tiled in seconds')) parts.push(f1)
+  if (frame(clip2, f2, [], 'Proof - it tiles seamlessly')) parts.push(f2)
   if (card(outro, 3.6, 'Visit textile-designer.ai', 'AI tools for textile & fashion design', 64).status === 0) parts.push(outro)
 
   const inputs = parts.flatMap((p) => ['-i', p])

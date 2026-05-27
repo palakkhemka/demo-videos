@@ -19,8 +19,28 @@ const PORT = Number(process.env.PORT || 8787)
 const IMG_RE = /\.(jpe?g|png|webp)$/i
 fs.mkdirSync(UPLOADS, { recursive: true })
 
+const SCRIPT_NAMES = {
+  'record-bg-remove2.mjs': 'Background Removal',
+  'record-bg-remove.mjs': 'Background Removal (standalone)',
+  'record-anti-blur-pro.mjs': 'Anti-Blur · Pro',
+  'record-anti-blur-legacy.mjs': 'Anti-Blur · Legacy',
+  'record-upscale.mjs': 'Ready to Print (2× & 4×)',
+  'record-vectorizer.mjs': 'Vectorizer',
+  'record-dress-to-design-advanced.mjs': 'Dress to Design · Advanced',
+  'record-dress-to-design-fine.mjs': 'Dress to Design · Fine Detail',
+  'record-color-transfer.mjs': 'Color Transfer',
+  'record-color-layering.mjs': 'Color Layering (+ Photopea)',
+  'record-repeat-set.mjs': 'Repeat Set (+ seamless proof)',
+  'record-repeat-checker.mjs': 'Seamless Checker',
+  'record-embroidery.mjs': 'Embroidery Effect',
+  'record-3d-effect.mjs': '3D Effect',
+}
+const prettyName = (f) =>
+  SCRIPT_NAMES[f] || f.replace(/^record-/, '').replace(/\.mjs$/, '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
 const listScripts = () =>
   fs.readdirSync(DEMO_DIR).filter((f) => /^record-.*\.mjs$/.test(f)).sort()
+    .map((f) => ({ file: f, name: prettyName(f) }))
 
 const listImages = () => {
   const root = fs.readdirSync(ASSETS).filter((f) => IMG_RE.test(f) && !/^logo-/.test(f)).map((f) => `assets/${f}`)
@@ -71,8 +91,8 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Demo Runne
   <div class="card">
     <label>Target site</label>
     <select id="site">
-      <option value="dev">Local dev — localhost:3000 (.profile)</option>
-      <option value="prod">Production — textile-designer.ai (.profile-prod)</option>
+      <option value="dev">Local dev - localhost:3000 (.profile)</option>
+      <option value="prod">Production - textile-designer.ai (.profile-prod)</option>
     </select>
   </div>
   <div class="card"><label>Script</label><select id="script"></select></div>
@@ -101,7 +121,7 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Demo Runne
 const $=s=>document.querySelector(s); let images=[]; const sel=new Set();
 async function load(){
   const r=await (await fetch('/api/list')).json();
-  $('#script').innerHTML=r.scripts.map(s=>'<option>'+s+'</option>').join('');
+  $('#script').innerHTML=r.scripts.map(s=>'<option value="'+s.file+'">'+s.name+'</option>').join('');
   images=r.images;
   $('#target').innerHTML='<option value="">(none)</option>'+images.map(p=>'<option>'+p+'</option>').join('');
   renderImgs();

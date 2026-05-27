@@ -1,4 +1,4 @@
-// Color Transfer demo — single video:
+// Color Transfer demo - single video:
 //   upload Source design -> zoom -> upload Target color reference -> zoom
 //   -> submit -> recolored result.
 // Two uploaders: SOURCE (first file input) + TARGET (second). Needs the
@@ -73,7 +73,7 @@ async function main() {
     outName: 'color-transfer-demo',
     titleUrl: 'textile-designer.ai/ai?tab=color_transfer',
     displayName: 'Color Transfer',
-    caption: 'Recoloring designs by hand — new palette in seconds',
+    caption: 'Recoloring designs by hand - new palette in seconds',
     viewport, t0, submitMs, resultMs,
   })
 }

@@ -137,7 +137,7 @@ async function main() {
     await uploadBtn.waitFor({ state: 'visible', timeout: 30000 })
     await sleep(900)
 
-    // model1 (default) — click the label to show the selection.
+    // model1 (default) - click the label to show the selection.
     await glideClick(page.getByText('Model 1', { exact: true })).catch(() => {})
     await sleep(900)
 
@@ -156,7 +156,7 @@ async function main() {
     ])
     console.log('submit response:', resp ? resp.status() : 'not observed')
 
-    // Wait for actual completion — the Download button only renders on completion.
+    // Wait for actual completion - the Download button only renders on completion.
     const downloadBtn = page.getByRole('button', { name: /download/i })
     let completed = false
     try {

@@ -9,7 +9,7 @@ recordTool({
   navLabel: /anti.?blur/i,
   outName: 'anti-blur-legacy-demo',
   displayName: 'Anti-Blur · Legacy',
-  caption: 'Blurry scans ruining your prints — sharp in seconds',
+  caption: 'Blurry scans ruining your prints - sharp in seconds',
   input: 'assets/blurry.jpg',
   doSlider: true,
   zoomInput: true,

@@ -1,4 +1,4 @@
-// Vectorizer — PNG -> SVG. Needs the vectorizer worker. Output is vector (no
+// Vectorizer - PNG -> SVG. Needs the vectorizer worker. Output is vector (no
 // before/after slider), so doSlider is off.
 import { recordTool } from './lib/demo-kit.mjs'
 

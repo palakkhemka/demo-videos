@@ -1,4 +1,4 @@
-// Color Layering demo — single video:
+// Color Layering demo - single video:
 //   upload -> run AUTOMATIC detection -> run MANUAL (set N layers) on same image
 //   -> open Photopea (photopea.com) and drop the resulting PSD to show the
 //   separated, editable layers.
@@ -77,8 +77,8 @@ async function main() {
     await runOnce('automatic')
     await clearBanner()
 
-    // Run 2: Manual — turn automatic off and set a layer count
-    await banner(`Manual — ${MANUAL_LAYERS} color layers`, '#2f6fed')
+    // Run 2: Manual - turn automatic off and set a layer count
+    await banner(`Manual - ${MANUAL_LAYERS} color layers`, '#2f6fed')
     await glide(page.getByText(/automatic color layer detection/i).first()).catch(() => {})
     await sleep(700)
     const layerInput = page.locator('input[type="number"], input[inputmode="numeric"]').first()
@@ -104,7 +104,7 @@ async function main() {
       await page.getByRole('link', { name: /start using photopea|open photopea|launch/i }).first().click({ timeout: 5000 }).catch(() => {})
       await page.getByRole('button', { name: /start using photopea|open photopea|launch/i }).first().click({ timeout: 3000 }).catch(() => {})
       await sleep(6000) // let the editor boot
-      await banner('Opening the PSD in Photopea — layers preserved', '#2f7d54')
+      await banner('Opening the PSD in Photopea - layers preserved', '#2f7d54')
       await page.evaluate(async ({ b64, name }) => {
         const bin = atob(b64)
         const arr = new Uint8Array(bin.length)
@@ -120,7 +120,7 @@ async function main() {
       await clearBanner()
       await page.screenshot({ path: path.join(dir, 'color-layering-photopea.png') }).catch(() => {})
     } else {
-      console.log('[color_layering] no PSD captured — skipping Photopea step')
+      console.log('[color_layering] no PSD captured - skipping Photopea step')
     }
     console.log('[color_layering] downloads:', downloads.length)
   } finally {
@@ -132,7 +132,7 @@ async function main() {
     outName: 'color-layering-demo',
     titleUrl: 'textile-designer.ai/ai?tab=color_layering',
     displayName: 'Color Layering',
-    caption: 'Separating designs into editable color layers — instantly',
+    caption: 'Separating designs into editable color layers - instantly',
     viewport, t0, spans,
   })
 }

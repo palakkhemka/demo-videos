@@ -24,18 +24,18 @@ const ctx = await chromium.launchPersistentContext(PROFILE, {
 const page = ctx.pages()[0] || (await ctx.newPage())
 
 console.log(`\nProfile: ${PROFILE}`)
-console.log('Opening the app — log in as agarwalpalak99@gmail.com.')
+console.log('Opening the app - log in as agarwalpalak99@gmail.com.')
 console.log('This window closes automatically once you reach /ai (or close it yourself).\n')
 
 await page.goto(`${BASE_URL}/ai`, { waitUntil: 'domcontentloaded' }).catch(() => {})
 
 try {
-  // Resolve when the workspace loads (logged in) — give plenty of time to log in.
+  // Resolve when the workspace loads (logged in) - give plenty of time to log in.
   await page.waitForURL('**/ai**', { timeout: 300000 })
-  console.log('Reached /ai — session saved to the profile. Closing.')
+  console.log('Reached /ai - session saved to the profile. Closing.')
   await page.waitForTimeout(2000)
 } catch {
-  console.log('Timed out waiting for /ai — closing anyway; session is saved if you logged in.')
+  console.log('Timed out waiting for /ai - closing anyway; session is saved if you logged in.')
 }
 
 await ctx.close()
