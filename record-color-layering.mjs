@@ -1,7 +1,6 @@
 // Color Layering demo - single video:
 //   upload -> run AUTOMATIC detection -> run MANUAL (set N layers) on same image
-//   -> open Photopea (photopea.com) and drop the resulting PSD to show the
-//   separated, editable layers.
+//   -> Photopea: open automatic PSD, File > Open manual PSD, click color_* layers.
 // Needs the color_layering worker (machine10 / api_worker) on DEV.
 // EXPERIMENTAL: the manual-count control + Photopea drop may need tuning when
 // the worker is live and a real PSD is produced.
@@ -12,7 +11,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createDemoSession, finalizeVideo, sleep } from './lib/demo-kit.mjs'
-import { openPsdInPhotopea } from './lib/photopea.mjs'
+import { createPageBanner, demoColorLayeringInPhotopea, sortDownloadsPsds } from './lib/photopea.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
@@ -24,15 +23,7 @@ async function main() {
   const { ctx, page, glide, fakeUpload, zoomEl, downloads, dir, t0, viewport, rp } = s
   const spans = []
 
-  const banner = async (text, color = '#2f6fed') => {
-    await page.evaluate(({ text, color }) => {
-      document.getElementById('tr-banner')?.remove()
-      const b = document.createElement('div'); b.id = 'tr-banner'
-      b.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:2147483500;background:' + color + ';color:#fff;font:600 22px Segoe UI,system-ui,sans-serif;padding:12px 26px;border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.4)'
-      b.textContent = text; document.body.appendChild(b)
-    }, { text, color })
-  }
-  const clearBanner = () => page.evaluate(() => document.getElementById('tr-banner')?.remove())
+  const { banner, clearBanner } = createPageBanner(page)
 
   const runOnce = async (modeLabel) => {
     const submitBtn = page.getByRole('button', { name: /^submit$/i })
@@ -94,17 +85,22 @@ async function main() {
     await runOnce('manual')
     await clearBanner()
 
-    // Photopea: Start using Photopea -> Open from computer -> captured PSD.
-    const psd = [...downloads].reverse().find((f) => /\.psd$/i.test(f)) || downloads[downloads.length - 1]
-    if (psd && fs.existsSync(psd)) {
-      const opened = await openPsdInPhotopea(page, psd, {
+    // Photopea: automatic PSD -> File > Open manual PSD -> click color_0, color_1, ...
+    const psds = sortDownloadsPsds(downloads)
+    const autoPsd = psds[0]
+    const manualPsd = psds[1]
+    if (autoPsd || manualPsd) {
+      await demoColorLayeringInPhotopea(page, {
+        autoPsd,
+        manualPsd,
+        layerCount: Number(MANUAL_LAYERS) || 5,
         glide,
         sleep,
         onBanner: banner,
         clearBanner,
         screenshotPath: path.join(rp.outputs, 'color-layering-photopea.png'),
       })
-      console.log('[color_layering] photopea ->', opened ? 'opened' : 'check screenshot')
+      console.log('[color_layering] photopea:', { auto: autoPsd ? path.basename(autoPsd) : '-', manual: manualPsd ? path.basename(manualPsd) : '-' })
     } else {
       console.log('[color_layering] no PSD captured - skipping Photopea step')
     }
