@@ -98,25 +98,31 @@ async function main() {
     if (psd && fs.existsSync(psd)) {
       const b64 = fs.readFileSync(psd).toString('base64')
       const psdName = path.basename(psd)
-      await page.goto('https://www.photopea.com', { waitUntil: 'domcontentloaded' })
-      await sleep(2500)
-      // Landing page → click "Start using Photopea" / "Open Photopea" to reach the editor.
-      await page.getByRole('link', { name: /start using photopea|open photopea|launch/i }).first().click({ timeout: 5000 }).catch(() => {})
-      await page.getByRole('button', { name: /start using photopea|open photopea|launch/i }).first().click({ timeout: 3000 }).catch(() => {})
-      await sleep(6000) // let the editor boot
+      // Photopea's editor lives at /?... — go straight there (skips the marketing
+      // landing) and use the Live Messaging API: postMessage the PSD as an
+      // ArrayBuffer and Photopea opens it directly (synthetic drag-drop is not
+      // trusted, so it never worked). Photopea posts back "done" when loaded.
+      await page.goto('https://www.photopea.com/', { waitUntil: 'domcontentloaded' })
+      await page.waitForFunction(() => !!(window.Photopea || (window.app && window.app.open)), null, { timeout: 20000 }).catch(() => {})
+      await sleep(3000) // let the editor finish booting
       await banner('Opening the PSD in Photopea - layers preserved', '#2f7d54')
-      await page.evaluate(async ({ b64, name }) => {
+      const opened = await page.evaluate(async ({ b64 }) => {
         const bin = atob(b64)
-        const arr = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-        const file = new File([arr], name, { type: 'image/vnd.adobe.photoshop' })
-        const dt = new DataTransfer()
-        dt.items.add(file)
-        for (const t of ['dragenter', 'dragover', 'drop']) {
-          document.body.dispatchEvent(new DragEvent(t, { dataTransfer: dt, bubbles: true, cancelable: true }))
-        }
-      }, { b64, name: psdName }).catch((e) => console.log('photopea drop failed:', e.message))
-      await sleep(7000) // let it parse + render the layers panel
+        const buf = new ArrayBuffer(bin.length)
+        const view = new Uint8Array(buf)
+        for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i)
+        return await new Promise((resolve) => {
+          let settled = false
+          const onMsg = (e) => {
+            if (e.data === 'done' && !settled) { settled = true; window.removeEventListener('message', onMsg); resolve(true) }
+          }
+          window.addEventListener('message', onMsg)
+          window.postMessage(buf, '*') // Photopea opens the file from the ArrayBuffer
+          setTimeout(() => { if (!settled) { settled = true; window.removeEventListener('message', onMsg); resolve(false) } }, 15000)
+        })
+      }, { b64 }).catch((e) => { console.log('photopea open failed:', e.message); return false })
+      console.log('[color_layering] photopea open ->', opened ? 'loaded' : 'no done signal (check screenshot)')
+      await sleep(3000) // let the layers panel paint
       await clearBanner()
       await page.screenshot({ path: path.join(dir, 'color-layering-photopea.png') }).catch(() => {})
     } else {

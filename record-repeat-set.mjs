@@ -12,7 +12,7 @@ import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
-import { createDemoSession, makeSocialCuts, sleep } from './lib/demo-kit.mjs'
+import { createDemoSession, makeSocialCuts, sleep, stamp, runPaths } from './lib/demo-kit.mjs'
 import { FONTS } from './config.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -23,9 +23,9 @@ const OUT = process.env.OUT || path.join(__dirname, 'output')
 const FFMPEG = path.join(__dirname, 'node_modules', 'ffmpeg-static', 'ffmpeg.exe')
 const VIEWPORT = { width: 1920, height: 1080 }
 const TYPES = [
-  { label: 'Full Repeat', re: /full repeat/i },
-  { label: 'Half Brick', re: /half brick/i },
-  { label: 'Half Drop', re: /half drop/i },
+  { label: 'Full Repeat', re: /full repeat/i, pt: 'full' },
+  { label: 'Half Brick', re: /half brick/i, pt: 'half-brick' },
+  { label: 'Half Drop', re: /half drop/i, pt: 'half-drop' },
 ]
 
 const CURSOR_AND_ZOOM = () => {
@@ -50,18 +50,19 @@ const newestWebm = (dir) => fs.readdirSync(dir).filter((f) => f.endsWith('.webm'
   .map((f) => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0]?.f
 
 async function main() {
-  const dir = path.join(OUT, 'repeat-set')
-  fs.mkdirSync(dir, { recursive: true })
+  // One run folder shared by both clips: videos/ holds the clips + final mp4,
+  // outputs/ the downloaded repeat outputs, input/ the source image.
+  const runId = process.env.DEMO_RUN_ID || stamp()
+  const rp = runPaths('repeat-set', runId)
+  const dir = rp.videos
   const clip1 = path.join(dir, 'clip1.webm')
   const clip2 = path.join(dir, 'clip2.webm')
   const spans = []
   let downloads = []
-  // Clear stale outputs from previous runs (different inputs) so we never mix images.
-  fs.rmSync(path.join(dir, 'downloads'), { recursive: true, force: true })
 
   // ---------- CLIP 1: Repeat Set (logged in) ----------
   {
-    const s = await createDemoSession({ dirName: 'repeat-set' })
+    const s = await createDemoSession({ dirName: 'repeat-set', runId })
     const { ctx, page, glide, fakeUpload, t0 } = s
     try {
       await page.goto(`${BASE_URL}/ai?tab=home`, { waitUntil: 'domcontentloaded' })
@@ -82,24 +83,60 @@ async function main() {
 
       const submitBtn = page.getByRole('button', { name: /^make repeat set$/i })
       const downloadBtn = page.getByRole('button', { name: /download/i })
+      // Captures land in s.downloads (the live session array, index-prefixed);
+      // strip the prefix to compare the real output name.
+      const coreOf = (p) => path.basename(p).replace(/^\d+-/, '')
+      // Wait for the "Make Repeat Set" button to reach an enabled/disabled state.
+      const waitBtn = (enabled, ms) => page.waitForFunction((want) => {
+        const b = [...document.querySelectorAll('button')].find((x) => /^make repeat set$/i.test((x.textContent || '').trim()))
+        return b ? (want ? !b.disabled : b.disabled) : false
+      }, enabled, { timeout: ms }).catch(() => {})
+
       for (const ty of TYPES) {
+        console.log(`[repeat_set] === ${ty.label} ===`)
         const preset = page.getByText(ty.re).first()
         if (await preset.count().catch(() => 0)) { await glide(preset, { force: true }).catch(() => {}); await sleep(800) }
-        await page.waitForFunction(() => {
-          const b = [...document.querySelectorAll('button')].find((x) => /^make repeat set$/i.test((x.textContent || '').trim()))
-          return b && !b.disabled
-        }, { timeout: 90000 }).catch(() => {})
+        await waitBtn(true, 90000) // clickable
         await sleep(400)
+        const seenCores = new Set(s.downloads.map(coreOf))
         const tSubmit = Date.now()
+        console.log(`[repeat_set] submitting ${ty.label} (seen so far: ${s.downloads.length})`)
         await Promise.all([
           page.waitForResponse((r) => r.url().includes('/api/sqs/send-task-message'), { timeout: 30000 }).catch(() => null),
           glide(submitBtn),
         ])
+        // Wait for THIS result: the button disables while the worker runs, then
+        // re-enables when the new output is ready. (Best-effort; short timeout on
+        // the "started" wait in case the tool is fast.)
+        await waitBtn(false, 8000)
+        console.log(`[repeat_set] ${ty.label} processing...`)
+        await waitBtn(true, 600000)
         try { await downloadBtn.first().waitFor({ state: 'visible', timeout: 600000 }) } catch {}
         spans.push({ start: (tSubmit - t0) / 1000 + 1.0, end: (Date.now() - t0) / 1000 - 0.5 })
+        await sleep(800)
+
+        // Download once and confirm a NOT-yet-seen output landed. The Download
+        // button persists from the previous type, so an early click can grab the
+        // stale prior output - if so, delete that duplicate and retry a few times
+        // (NOT a tight loop, so it never spams the downloads folder).
+        let captured = null
+        for (let tries = 0; tries < 6 && !captured; tries++) {
+          await Promise.all([
+            page.waitForEvent('download', { timeout: 10000 }).catch(() => null),
+            glide(downloadBtn.first()).catch(() => {}),
+          ])
+          await sleep(1500) // let the save handler write the file
+          captured = s.downloads.find((p) => !seenCores.has(coreOf(p))) || null
+          if (!captured) {
+            const last = s.downloads[s.downloads.length - 1]
+            if (last && seenCores.has(coreOf(last))) { try { fs.rmSync(last) } catch {} ; s.downloads.pop() }
+            console.log(`[repeat_set] ${ty.label}: result not ready, retry ${tries + 1}/6`)
+            await sleep(5000)
+          }
+        }
+        if (captured) console.log(`[repeat_set] captured ${ty.label} -> ${path.basename(captured)}`)
+        else console.log(`[repeat_set] WARN: no fresh download for ${ty.label}`)
         await sleep(1000)
-        await glide(downloadBtn.first()).catch(() => {})
-        await sleep(1500)
       }
       // Only THIS run's captured outputs (in submit order: Full, Half Brick, Half Drop).
       downloads = s.downloads.slice()
@@ -147,16 +184,16 @@ async function main() {
       await page.evaluate(() => document.getElementById('tr-picker')?.remove())
       await page.locator('#fileInput').setInputFiles(file).catch(() => {})
     }
-    const tile = async (file, label, color, fileName, cycle = false) => {
+    const tile = async (file, label, color, fileName, { cycle = false, patternType = null } = {}) => {
       await page.goto(`${BASE_URL}/tools/repeat_checker`, { waitUntil: 'domcontentloaded' })
       await page.waitForSelector('#fileInput', { state: 'attached', timeout: 30000 })
       await page.getByRole('button', { name: /^Accept$/ }).click({ timeout: 3000 }).catch(() => {})
       await banner(label, color)
       await pickFromDownloads(file, fileName)
       await sleep(1500)
-      const grid = page.locator('input[type="range"]').first()
-      const gb = await grid.boundingBox().catch(() => null)
-      if (gb) { await page.mouse.click(gb.x + gb.width * 0.66, gb.y + gb.height / 2); await sleep(900) }
+      // Keep the grid at its 2x2 default (the page loads with gridSize=2; range
+      // is 1-4). Previously the slider was dragged to ~66% which snapped it to
+      // 3x3 - we now leave the initial 2x2 view as requested.
       // For the raw input: show it tiled in every repeat type (seams in each).
       if (cycle) {
         for (const [val, name] of [['full', 'Full'], ['half-brick', 'Half Brick'], ['half-drop', 'Half Drop']]) {
@@ -164,6 +201,12 @@ async function main() {
           await glide(page.locator(`input[name="patternType"][value="${val}"]`)).catch(() => {})
           await sleep(1400)
         }
+      } else if (patternType) {
+        // Each repeat-set output was generated for a specific repeat type - set
+        // the checker to the SAME pattern type so it previews seamlessly (Half
+        // Brick / Half Drop were previously left on the default Full).
+        await glide(page.locator(`input[name="patternType"][value="${patternType}"]`)).catch(() => {})
+        await sleep(1300)
       }
       await glide(page.getByRole('button', { name: /enlarge preview/i }))
       await sleep(800)
@@ -175,10 +218,10 @@ async function main() {
       await sleep(400)
     }
     try {
-      await tile(INPUT, 'Original - seams in every repeat', '#b4453c', 'design.png', true)
+      await tile(INPUT, 'Original - seams in every repeat', '#b4453c', 'design.png', { cycle: true })
       for (let i = 0; i < downloads.slice(0, 3).length; i++) {
         const fn = (TYPES[i]?.label || 'repeat').toLowerCase().replace(/ /g, '_') + '_output.png'
-        await tile(downloads[i], `${TYPES[i]?.label || 'Repeat Set'} - seamless`, '#2f7d54', fn)
+        await tile(downloads[i], `${TYPES[i]?.label || 'Repeat Set'} - seamless`, '#2f7d54', fn, { patternType: TYPES[i]?.pt })
       }
     } finally {
       await ctx.close().catch(() => {}); await browser.close().catch(() => {})
@@ -227,7 +270,7 @@ function stitch(dir, clip1, clip2, spans) {
   }
   const card = (out, dur, title, subtitle, size) => run(['-f', 'lavfi', '-i', `gradients=s=${OW}x${OH}:c0=0x14294a:c1=0x2f6a4a:d=${dur}`, '-loop', '1', '-t', String(dur), '-i', logo, '-filter_complex', `[1:v]scale=300:300[lg];[0:v][lg]overlay=(W-w)/2:(H-h)/2-150[bg];[bg]drawtext=fontfile=${uib}:text='${title}':fontcolor=white:fontsize=${size}:x=(w-text_w)/2:y=H/2+90,drawtext=fontfile=${ui}:text='${subtitle}':fontcolor=0xbcd6c8:fontsize=36:x=(w-text_w)/2:y=H/2+185,fade=t=in:st=0:d=0.5,fade=t=out:st=${dur - 0.5}:d=0.5,format=yuv420p[out]`, '-map', '[out]', '-r', '25', '-c:v', 'libx264', out])
 
-  const f1 = path.join(dir, 'f1.mp4'), f2 = path.join(dir, 'f2.mp4'), intro = path.join(dir, 'intro.mp4'), outro = path.join(dir, 'outro.mp4'), mp4 = path.join(dir, 'repeat-set-demo.mp4')
+  const f1 = path.join(dir, 'f1.mp4'), f2 = path.join(dir, 'f2.mp4'), intro = path.join(dir, 'intro.mp4'), outro = path.join(dir, 'outro.mp4'), mp4 = path.join(dir, `repeat-set-demo-${stamp()}.mp4`)
   const parts = []
   if (card(intro, 3, 'Textile Designer AI', 'Repeat Set', 70).status === 0) parts.push(intro)
   if (frame(clip1, f1, spans, 'Hours making seamless repeats - tiled in seconds')) parts.push(f1)
