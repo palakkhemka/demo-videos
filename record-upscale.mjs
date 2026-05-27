@@ -27,6 +27,16 @@ async function main() {
   const s = await createDemoSession({ dirName: 'upscale' })
   const { ctx, page, glide, fakeUpload, zoomEl, downloads, dir, t0, viewport, rp } = s
   const spans = []
+  const banner = async (text, color = '#2f6fed') => {
+    await page.evaluate(({ text, color }) => {
+      document.getElementById('tr-banner')?.remove()
+      const b = document.createElement('div'); b.id = 'tr-banner'
+      b.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:2147483500;background:' + color + ';color:#fff;font:600 22px Segoe UI,system-ui,sans-serif;padding:12px 26px;border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.4)'
+      b.textContent = text
+      document.body.appendChild(b)
+    }, { text, color })
+  }
+  const clearBanner = () => page.evaluate(() => document.getElementById('tr-banner')?.remove())
 
   try {
     await page.goto(`${BASE_URL}/ai?tab=home`, { waitUntil: 'domcontentloaded' })
@@ -65,6 +75,8 @@ async function main() {
 
     for (const { scale: sc, creativity: cr } of RUNS) {
       console.log(`[upscale] === ${sc}x @ ${cr}% creativity ===`)
+      await banner(`Scale factor: ${sc}x`, '#2f6fed')
+      await sleep(900)
       // Scale factor via the Advanced "Select" dropdown (fixed menu, z-index 9999,
       // of 1/2/3/4 option buttons). The old code typed into the first <input> on
       // the page - the wrong field - so the scale never actually changed.
@@ -76,6 +88,8 @@ async function main() {
 
       // Creativity is the first percent number-box in the Advanced panel
       // (resemblance is the second). Type the percent and commit with Tab.
+      await banner(`Creativity: ${cr}%`, '#2f7d54')
+      await sleep(800)
       const crBox = page.locator('input[type="number"]').first()
       await crBox.click({ timeout: 5000 }).catch(() => {})
       await crBox.fill(String(cr)).catch(() => {})
@@ -132,6 +146,7 @@ async function main() {
       }
       if (captured) { outputs.push({ file: captured, label: `${sc}× · ${cr}%` }); console.log(`[upscale] captured ${sc}x @ ${cr}% -> ${path.basename(captured)}`) }
       else console.log(`[upscale] WARN: no fresh download for ${sc}x @ ${cr}%`)
+      await clearBanner()
       await sleep(1000)
     }
 
@@ -143,8 +158,7 @@ async function main() {
     const cards = outputs.map((o) => ({ src: toData(o.file), label: o.label }))
     console.log(`[upscale] loupe comparison of ${cards.length} outputs`)
     if (cards.length) {
-      const dur = Math.max(7, cards.length * 2)
-      await page.evaluate(({ cards, dur }) => new Promise((resolve) => {
+      const runLoupe = async (dur) => page.evaluate(({ cards, dur }) => new Promise((resolve) => {
         const ov = document.createElement('div'); ov.id = 'tr-cmp'
         ov.style.cssText = 'position:fixed;inset:0;z-index:2147483500;background:rgba(13,27,42,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:Segoe UI,system-ui,sans-serif;color:#e8eef4'
         const title = document.createElement('div'); title.style.cssText = 'font-size:26px;font-weight:700'
@@ -200,7 +214,45 @@ async function main() {
           }
           requestAnimationFrame(tick)
         })
-      }), { cards, dur }).catch((e) => console.log('loupe failed:', e.message))
+      }), { cards, dur })
+
+      const runStaticCompare = async () => page.evaluate(({ cards }) => new Promise((resolve) => {
+        const ov = document.createElement('div')
+        ov.id = 'tr-cmp-fallback'
+        ov.style.cssText = 'position:fixed;inset:0;z-index:2147483500;background:rgba(13,27,42,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:Segoe UI,system-ui,sans-serif;color:#e8eef4'
+        const title = document.createElement('div')
+        title.style.cssText = 'font-size:26px;font-weight:700'
+        title.textContent = 'Ready to Print - result comparison'
+        const cols = cards.length <= 2 ? cards.length : 2
+        const grid = document.createElement('div')
+        grid.style.cssText = `display:grid;grid-template-columns:repeat(${cols},360px);gap:14px`
+        cards.forEach((c) => {
+          const cell = document.createElement('div')
+          cell.style.cssText = 'position:relative;width:360px;height:360px;border-radius:12px;overflow:hidden;box-shadow:0 8px 30px #000'
+          const im = document.createElement('img')
+          im.src = c.src
+          im.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block'
+          const lab = document.createElement('div')
+          lab.textContent = c.label
+          lab.style.cssText = 'position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);font-size:15px;font-weight:600;padding:5px 8px;text-align:center'
+          cell.appendChild(im); cell.appendChild(lab); grid.appendChild(cell)
+        })
+        ov.appendChild(title); ov.appendChild(grid); document.body.appendChild(ov)
+        setTimeout(() => { ov.remove(); resolve() }, 3500)
+      }), { cards })
+
+      const dur = Math.max(7, cards.length * 2)
+      try {
+        await runLoupe(dur)
+      } catch (e) {
+        console.log('loupe failed:', e.message)
+        console.log('[upscale] retrying loupe with shorter pass...')
+        try { await runLoupe(4.5) }
+        catch {
+          console.log('[upscale] loupe retry failed - showing static comparison fallback')
+          await runStaticCompare().catch(() => {})
+        }
+      }
     }
 
     await page.screenshot({ path: path.join(rp.outputs, 'upscale-final.png') }).catch(() => {})

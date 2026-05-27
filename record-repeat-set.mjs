@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 import { createDemoSession, makeSocialCuts, sleep, stamp, runPaths } from './lib/demo-kit.mjs'
 import { FONTS } from './config.mjs'
+import { renderCard } from './lib/cards.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
@@ -268,14 +269,15 @@ function stitch(dir, clip1, clip2, spans) {
     const r = run(['-i', webm, '-f', 'lavfi', '-i', `gradients=s=${OW}x${OH}:c0=0x1f3a5f:c1=0x3f7d54:d=600`, '-filter_complex', filter, '-map', '[out]', '-r', '25', '-c:v', 'libx264', out])
     return r.status === 0
   }
-  const card = (out, dur, title, subtitle, size) => run(['-f', 'lavfi', '-i', `gradients=s=${OW}x${OH}:c0=0x14294a:c1=0x2f6a4a:d=${dur}`, '-loop', '1', '-t', String(dur), '-i', logo, '-filter_complex', `[1:v]scale=300:300[lg];[0:v][lg]overlay=(W-w)/2:(H-h)/2-150[bg];[bg]drawtext=fontfile=${uib}:text='${title}':fontcolor=white:fontsize=${size}:x=(w-text_w)/2:y=H/2+90,drawtext=fontfile=${ui}:text='${subtitle}':fontcolor=0xbcd6c8:fontsize=36:x=(w-text_w)/2:y=H/2+185,fade=t=in:st=0:d=0.5,fade=t=out:st=${dur - 0.5}:d=0.5,format=yuv420p[out]`, '-map', '[out]', '-r', '25', '-c:v', 'libx264', out])
+  const cardOpts = { layout: 'classic', bg: 'gradient', showLogo: true, W: OW, H: OH, logo }
+  const mkCard = (out, dur, title, subtitle) => renderCard({ out, dur, title, subtitle, ...cardOpts }).status === 0
 
   const f1 = path.join(dir, 'f1.mp4'), f2 = path.join(dir, 'f2.mp4'), intro = path.join(dir, 'intro.mp4'), outro = path.join(dir, 'outro.mp4'), mp4 = path.join(dir, `repeat-set-demo-${stamp()}.mp4`)
   const parts = []
-  if (card(intro, 3, 'Textile Designer AI', 'Repeat Set', 70).status === 0) parts.push(intro)
+  if (mkCard(intro, 3, 'Textile Designer AI', 'Repeat Set')) parts.push(intro)
   if (frame(clip1, f1, spans, 'Hours making seamless repeats - tiled in seconds')) parts.push(f1)
   if (frame(clip2, f2, [], 'Proof - it tiles seamlessly')) parts.push(f2)
-  if (card(outro, 3.6, 'Visit textile-designer.ai', 'AI tools for textile & fashion design', 64).status === 0) parts.push(outro)
+  if (mkCard(outro, 3.6, 'Visit textile-designer.ai', 'AI tools for textile & fashion design')) parts.push(outro)
 
   const inputs = parts.flatMap((p) => ['-i', p])
   const cc = parts.map((_, i) => `[${i}:v]`).join('') + `concat=n=${parts.length}:v=1:a=0,format=yuv420p[out]`

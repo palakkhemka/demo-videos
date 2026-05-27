@@ -10,18 +10,23 @@
 
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
 import { chromium } from 'playwright-core'
 import { recordPage } from 'testreel'
+import { runPaths, stamp } from './lib/demo-kit.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
 const HEADLESS = process.env.HEADLESS === '1'
-const OUT = process.env.OUT || path.join(__dirname, 'output')
 const SAMPLE = path.join(__dirname, 'assets', 'sample-tile.svg')
 const VIEWPORT = { width: 1280, height: 800 }
 
 async function main() {
+  const runId = process.env.DEMO_RUN_ID || stamp()
+  const rp = runPaths('repeat-checker', runId)
+  const OUT = rp.videos
+  try { fs.copyFileSync(SAMPLE, path.join(rp.input, path.basename(SAMPLE))) } catch {}
   const browser = await chromium.launch({ headless: HEADLESS })
   const context = await browser.newContext({
     viewport: VIEWPORT,

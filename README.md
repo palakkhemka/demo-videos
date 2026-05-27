@@ -51,8 +51,10 @@ output videos. Outputs land in `output/<tool>/`.
 ```bash
 # dev
 node record-bg-remove2.mjs
-# prod, custom input
+# prod, custom input (bash)
 BASE_URL=https://textile-designer.ai PROFILE=.profile-prod INPUT=assets/input.jpg node record-bg-remove2.mjs
+# dev/prod on bundled Chromium instead of Chrome
+BROWSER=chromium node record-bg-remove2.mjs
 ```
 
 ## Configuration
@@ -63,6 +65,7 @@ All in `config.mjs`, overridable by env var:
 |-----|---------|---------|
 | `BASE_URL` | `http://localhost:3000` | target site |
 | `PROFILE` / `PROFILE_PROD` | `.profile` / `.profile-prod` | logged-in Chrome profile dir |
+| `BROWSER` | `chrome` | `chrome` (default) or `chromium` |
 | `INPUT` | `assets/input.jpg` | input image |
 | `TARGET` | `assets/colors-target.jpg` | 2nd image (color_transfer) |
 | `HEADLESS` | off | `1` = no window |

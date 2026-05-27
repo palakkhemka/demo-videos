@@ -17,6 +17,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { renderCard } from './lib/cards.mjs'
 import { makeSocialCuts, runPaths } from './lib/demo-kit.mjs'
+import { FONT_PATHS } from './config.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const env = (k, d) => (process.env[k] !== undefined && process.env[k] !== '' ? process.env[k] : d)
@@ -36,6 +37,8 @@ const cards = [
   { kind: 'intro', title: env('INTRO_TITLE', 'Textile Designer AI'), subtitle: env('INTRO_SUBTITLE', 'AI tools for textile & fashion design'), dur: Number(env('INTRO_SEC', '3')) },
   { kind: 'outro', title: env('OUTRO_TITLE', 'Visit textile-designer.ai'), subtitle: env('OUTRO_SUBTITLE', 'Start creating today'), dur: Number(env('OUTRO_SEC', '3.6')) },
 ]
+
+console.log('[fonts] regular:', FONT_PATHS.ui, '| bold:', FONT_PATHS.uib)
 
 for (const c of cards) {
   const out = path.join(rp.videos, `${c.kind}-${layout}.mp4`)

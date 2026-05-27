@@ -1,29 +1,37 @@
-// Standalone Photopea pipeline (test): open photopea.com -> "Start using
-// Photopea" -> "Open from computer" -> feed a PSD -> show the preserved layers.
-// Uses an existing color_layering PSD by default. Public site, no login.
+// Standalone Photopea test: Start using Photopea -> Open from computer -> PSD.
 //
 // Usage:  node photopea-open.mjs
-//   INPUT=path/to/file.psd  to override the PSD.
+//   INPUT=assets/people-sep (1).psd
 
 import path from 'node:path'
 import fs from 'node:fs'
-import http from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 import { finalizeVideo, sleep } from './lib/demo-kit.mjs'
+import { openPsdInPhotopea } from './lib/photopea.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const HEADLESS = process.env.HEADLESS === '1'
 const VIEWPORT = { width: 1920, height: 1080 }
 
 function defaultPsd() {
-  const d = path.join(__dirname, 'output', 'color-layering', 'downloads')
+  const d = path.join(__dirname, 'output', 'color-layering')
   if (!fs.existsSync(d)) return null
-  const psds = fs.readdirSync(d).filter((f) => /\.psd$/i.test(f))
-    .map((f) => ({ p: path.join(d, f), t: fs.statSync(path.join(d, f)).mtimeMs }))
-    .sort((a, b) => b.t - a.t)
-  return psds[0]?.p || null
+  let found = null
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const ab = path.join(dir, e.name)
+      if (e.isDirectory()) walk(ab)
+      else if (/\.psd$/i.test(e.name)) {
+        const t = fs.statSync(ab).mtimeMs
+        if (!found || t > found.t) found = { p: ab, t }
+      }
+    }
+  }
+  walk(d)
+  return found?.p || null
 }
+
 const PSD = process.env.INPUT ? path.resolve(__dirname, process.env.INPUT) : defaultPsd()
 
 const CURSOR = () => {
@@ -50,25 +58,16 @@ async function main() {
   const page = await ctx.newPage()
   const glide = async (loc) => { const b = await loc.boundingBox().catch(() => null); if (b) { await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 22 }); await sleep(250) } await loc.click({ timeout: 8000 }).catch(() => {}) }
 
-  // Serve the PSD locally (CORS) so Photopea can fetch it by URL. http://localhost
-  // is exempt from mixed-content blocking, so https Photopea can load it.
-  const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/octet-stream' })
-    fs.createReadStream(PSD).pipe(res)
-  })
-  await new Promise((r) => server.listen(0, r))
-  const psdUrl = `http://localhost:${server.address().port}/layers.psd`
-
   try {
-    // Photopea URL-config API: open the PSD by URL on load.
-    const cfg = encodeURIComponent(JSON.stringify({ files: [psdUrl] }))
-    await page.goto(`https://www.photopea.com/#${cfg}`, { waitUntil: 'domcontentloaded' })
-    await sleep(22000) // Photopea boots + fetches + parses the PSD into layers
-    await page.screenshot({ path: path.join(dir, 'photopea-test-final.png') }).catch(() => {})
-    console.log('opened via URL config:', psdUrl)
+    await openPsdInPhotopea(page, PSD, {
+      glide,
+      sleep,
+      screenshotPath: path.join(dir, 'photopea-test-final.png'),
+    })
     console.log('done')
   } finally {
-    await ctx.close().catch(() => {}); await browser.close().catch(() => {}); server.close()
+    await ctx.close().catch(() => {})
+    await browser.close().catch(() => {})
   }
 
   await finalizeVideo({ dir, outName: 'photopea-test', titleUrl: 'www.photopea.com', displayName: 'Color Layers in Photopea', caption: 'Editable color layers - open anywhere', viewport: VIEWPORT })

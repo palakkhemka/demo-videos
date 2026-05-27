@@ -13,12 +13,13 @@ import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
+import { runPaths, stamp } from './lib/demo-kit.mjs'
+import { FONTS } from './config.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
 const HEADLESS = process.env.HEADLESS === '1'
 const PROFILE = process.env.PROFILE || path.join(__dirname, '.profile')
-const OUT = process.env.OUT || path.join(__dirname, 'output')
 const INPUT = process.env.INPUT || path.join(__dirname, 'assets', 'input.jpg')
 const RESULT_TIMEOUT_MS = Number(process.env.RESULT_TIMEOUT_MS || 120000)
 const FFMPEG = path.join(__dirname, 'node_modules', 'ffmpeg-static', 'ffmpeg.exe')
@@ -27,6 +28,10 @@ const VIEWPORT = { width: 1920, height: 1080 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 async function main() {
+  const runId = process.env.DEMO_RUN_ID || stamp()
+  const rp = runPaths('bg-remove', runId)
+  const OUT = rp.videos
+  try { fs.copyFileSync(path.resolve(INPUT), path.join(rp.input, path.basename(INPUT))) } catch {}
   fs.mkdirSync(OUT, { recursive: true })
   const ctx = await chromium.launchPersistentContext(PROFILE, {
     channel: 'chrome',
@@ -187,7 +192,7 @@ async function main() {
       }
     }
 
-    await page.screenshot({ path: path.join(OUT, 'bg-remove-final.png') })
+    await page.screenshot({ path: path.join(rp.outputs, 'bg-remove-final.png') })
     console.log('COMPLETED:', completed)
   } finally {
     await ctx.close().catch(() => {})
@@ -205,8 +210,7 @@ async function main() {
 
   const TB = 44, PAD = 60, W = VIEWPORT.width, H = VIEWPORT.height
   const OW = W + 2 * PAD, OH = H + TB + 2 * PAD
-  const sym = 'C\\:/Windows/Fonts/seguisym.ttf'
-  const ui = 'C\\:/Windows/Fonts/segoeui.ttf'
+  const { sym, ui } = FONTS
   const dy = Math.round((TB - 20) / 2)
   const filter = [
     `[0:v]pad=iw:ih+${TB}:0:${TB}:color=0xf2f2f3[bar]`,

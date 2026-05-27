@@ -23,33 +23,32 @@ Status: [x] done (code-level, needs verify run)  ·  [~] in progress  ·  [ ] to
       filling the width) instead of a tiny strip on a flat gradient.
 
 ## In progress
-- [~] Intro/Outro: NEW layout styles + standalone script DONE (lib/cards.mjs +
-      record-intro-outro.mjs, 4 layouts verified). Runner Intro/Outro TAB still
-      pending (deferred behind UX work).
-- [~] Runner UX: DONE this round - History is now a file-explorer folder browser
+- [x] Intro/Outro: NEW layout styles + standalone script DONE (lib/cards.mjs +
+      record-intro-outro.mjs, 4 layouts verified). Runner Intro/Outro TAB added
+      with layout/background/title/duration controls and render logs/results.
+- [x] Runner UX: DONE this round - History is now a file-explorer folder browser
       (folder tiles w/ preview + counts, breadcrumb, flat "all videos" vs nested
       toggle), thumbnails come from the run's output/input image (not a home-screen
       frame), videos open in the OS default player, target site defaults to Production.
-      Still open: input folders/collections, intro/outro tab, broader polish.
+      Input folders/collections + intro/outro tab are now shipped; broader polish remains.
 
 ## New / todo
 - [ ] Vectorizer demo exercises NO formats - tool has output_format svg|eps|png +
       detail coarse..superFine + grouping. Decide what to showcase and implement.
 
 ## Todo (big, interdependent - one runner/storage redesign)
-- [ ] Per-run output folder structure: output/{task_type}/run_{id}/ with input/ (the
+- [x] Per-run output folder structure: output/{task_type}/run_{id}/ with input/ (the
       uploaded image), outputs/ (each result), videos/ (each format incl social cuts).
       Refactor demo-kit + every script + the History scan.
-- [ ] Runner inputs: folder structure / collections - organize inputs into named
+- [x] Runner inputs: folder structure / collections - organize inputs into named
       folders, add inputs to a new folder (mirror the History folder UX).
-- [ ] Social-media cuts: further work beyond the reframe - per-platform safe zones,
+- [x] Social-media cuts: further work beyond the reframe - per-platform safe zones,
       burned-in captions/branding, per-format intro/outro, Shorts/Reels durations,
       choose which formats to export. (Define specifics.)
 
 ## Blocked / parked
-- [!] Photopea: open the generated PSD to show editable layers. photopea.com is now an
-      SPA marketing landing; root URL, hash-config iframe, and the "Start using Photopea"
-      button do not reach the editor in an automatable way. Needs a focused session.
+- [~] Photopea: integrated into color_layering via lib/photopea.mjs (Start using Photopea
+      -> Open from computer). Verify on a live color_layering run with a real PSD download.
 
 ## Open questions / follow-ups
 - Anti-blur Pro vs Legacy land in separate folders (anti-blur-pro / anti-blur-legacy).

@@ -9,6 +9,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { FONT_PATHS } from './config.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DEMO_DIR = __dirname
@@ -20,6 +21,21 @@ const FFMPEG = path.join(DEMO_DIR, 'node_modules', 'ffmpeg-static', 'ffmpeg.exe'
 const PORT = Number(process.env.PORT || 8787)
 const IMG_RE = /\.(jpe?g|png|webp)$/i
 fs.mkdirSync(UPLOADS, { recursive: true })
+const INPUT_ROOT = ASSETS
+
+function chromeExecutable() {
+  if (process.env.CHROME_PATH) return process.env.CHROME_PATH
+  if (process.platform === 'win32') {
+    const candidates = [
+      'C:/Program Files/Google/Chrome/Application/chrome.exe',
+      'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+    ]
+    for (const c of candidates) if (fs.existsSync(c)) return c
+    return null
+  }
+  if (process.platform === 'darwin') return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  return 'google-chrome'
+}
 
 // First .mp4 found anywhere under a directory (for a folder-tile preview).
 function firstVideo(absDir) {
@@ -92,6 +108,29 @@ function countVideos(absDir) {
   return n
 }
 
+function browseInputs(rel) {
+  const clean = String(rel || '').replace(/^[/\\]+/, '')
+  const abs = path.resolve(INPUT_ROOT, clean)
+  if (!abs.startsWith(INPUT_ROOT) || !fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) return { path: clean, dirs: [], files: [] }
+  const dirs = [], files = []
+  for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
+    if (e.name.startsWith('.')) continue
+    if (e.name === '.thumbs') continue
+    const ab = path.join(abs, e.name)
+    const childRel = path.relative(INPUT_ROOT, ab).replace(/\\/g, '/')
+    if (e.isDirectory()) {
+      const count = listImages(childRel).length
+      dirs.push({ name: e.name, path: childRel, count })
+    } else if (IMG_RE.test(e.name) && !/^logo-/.test(e.name)) {
+      const st = fs.statSync(ab)
+      files.push({ name: e.name, kind: 'image', path: path.relative(DEMO_DIR, ab).replace(/\\/g, '/'), mb: +(st.size / 1e6).toFixed(1), mtime: st.mtimeMs })
+    }
+  }
+  dirs.sort((a, b) => (a.name < b.name ? -1 : 1))
+  files.sort((a, b) => b.mtime - a.mtime)
+  return { path: clean, dirs, files }
+}
+
 // The result image makes a far better poster than a video frame (a frame just
 // lands on the intro/home screen). For .../run_x/videos/foo.mp4 prefer an image
 // from the sibling outputs/ (the result), then input/ (the source).
@@ -150,11 +189,29 @@ const listScripts = () =>
 
 // Option env keys forwarded from query string to the spawned script (intro/outro).
 const CARD_ENV_KEYS = ['CARD_LAYOUT', 'CARD_BG', 'CARD_BG_IMAGE', 'CARD_BG_COLOR', 'CARD_LOGO', 'CARD_SOCIAL', 'INTRO_TITLE', 'INTRO_SUBTITLE', 'INTRO_SEC', 'OUTRO_TITLE', 'OUTRO_SUBTITLE', 'OUTRO_SEC']
+const fontEnv = () => ({
+  FONT_REGULAR: FONT_PATHS.ui,
+  FONT_BOLD: FONT_PATHS.uib,
+  FONT_SYMBOL: FONT_PATHS.sym,
+})
 
-const listImages = () => {
-  const root = fs.readdirSync(ASSETS).filter((f) => IMG_RE.test(f) && !/^logo-/.test(f)).map((f) => `assets/${f}`)
-  const up = fs.existsSync(UPLOADS) ? fs.readdirSync(UPLOADS).filter((f) => IMG_RE.test(f)).map((f) => `assets/uploads/${f}`) : []
-  return [...root, ...up]
+const listImages = (sub = '') => {
+  const root = path.resolve(INPUT_ROOT, sub || '')
+  if (!root.startsWith(INPUT_ROOT) || !fs.existsSync(root)) return []
+  const out = []
+  const walk = (d) => {
+    let es = []
+    try { es = fs.readdirSync(d, { withFileTypes: true }) } catch { return }
+    for (const e of es) {
+      if (e.name.startsWith('.')) continue
+      if (e.name === '.thumbs') continue
+      const ab = path.join(d, e.name)
+      if (e.isDirectory()) walk(ab)
+      else if (IMG_RE.test(e.name) && !/^logo-/.test(e.name)) out.push(path.relative(DEMO_DIR, ab).replace(/\\/g, '/'))
+    }
+  }
+  walk(root)
+  return out.sort()
 }
 
 const sanitize = (s) => s.replace(/[^a-z0-9._-]+/gi, '_')
@@ -308,11 +365,39 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
   .tile .cap{padding:10px 11px 2px;font:12px var(--mono);color:#dbe6df;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .tile .sub2{padding:0 11px 10px;color:var(--mut);font-size:11px}
   .empty{color:var(--mut);padding:24px 0}
+  .presetGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+  .preset{background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:10px;cursor:pointer;transition:.12s}
+  .preset:hover{border-color:var(--acc)}
+  .preset.on{border-color:var(--acc);box-shadow:0 0 0 2px rgba(91,214,160,.2)}
+  .preset .ttl{font-size:12px;font-weight:700;margin-bottom:7px}
+  .pvMini{height:78px;border-radius:9px;border:1px solid #2c3442;position:relative;overflow:hidden;background:linear-gradient(140deg,#163153,#2f6a4a)}
+  .pvMini.solid{background:#26425b}
+  .pvMini.image{background:linear-gradient(135deg,#3a2e5d,#7a4b6f)}
+  .pvMini .logo{position:absolute;top:8px;left:8px;width:16px;height:16px;border-radius:4px;background:#fff}
+  .pvMini .line{position:absolute;left:10px;right:10px;height:6px;border-radius:99px;background:#ffffffb5}
+  .pvMini .line.sub{background:#d7e4d8a8;height:5px}
+  .pvMini.classic .line.t{top:28px}.pvMini.classic .line.sub{top:40px}
+  .pvMini.center .line.t{top:34px}.pvMini.center .line.sub{top:46px}
+  .pvMini.lower-third .line.t{top:52px}.pvMini.lower-third .line.sub{top:63px}
+  .pvMini.split .line.t{top:26px;left:55%}.pvMini.split .line.sub{top:38px;left:55%}
+  .cardPreview{height:160px;border-radius:12px;border:1px solid var(--line2);position:relative;overflow:hidden}
+  .cardPreview.grad{background:linear-gradient(145deg,#14294a,#2f6a4a)}
+  .cardPreview.solid{background:#26425b}
+  .cardPreview.image{background:linear-gradient(135deg,#3a2e5d,#7a4b6f)}
+  .cardPreview .lg{position:absolute;top:12px;left:12px;width:28px;height:28px;border-radius:7px;background:#fff}
+  .cardPreview .tx{position:absolute;left:16px;right:16px;color:#fff}
+  .cardPreview .tx.t{font-weight:700;font-size:18px}
+  .cardPreview .tx.s{font-size:13px;color:#d4e6d8}
+  .cardPreview.classic .tx.t{top:58px}.cardPreview.classic .tx.s{top:84px}
+  .cardPreview.center .tx.t{top:68px;text-align:center}.cardPreview.center .tx.s{top:92px;text-align:center}
+  .cardPreview.lower-third .tx.t{top:102px}.cardPreview.lower-third .tx.s{top:124px}
+  .cardPreview.split .tx.t{top:56px;left:54%}.cardPreview.split .tx.s{top:82px;left:54%}
 </style></head><body>
 <div class="app">
   <aside class="rail">
     <div class="brand"><img src="/file/assets/logo-main.png" alt=""><div class="wm">Demo Studio<small>Textile Designer AI</small></div></div>
     <button class="nav on" id="tabRun"><span class="ic">⦿</span> Record</button>
+    <button class="nav" id="tabCards"><span class="ic">▣</span> Intro/Outro</button>
     <button class="nav" id="tabHist"><span class="ic">▦</span> Library</button>
     <div class="rail-foot">
       <div class="lab">Target site</div>
@@ -329,9 +414,10 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <label style="margin:0">Input images <span class="sub" id="selcount"></span></label>
-        <div class="row" style="gap:8px"><button class="ghost" id="urlBtn">Fetch URLs</button><button class="ghost" id="addBtn">+ Upload</button></div>
+        <div class="row" style="gap:8px"><button class="ghost" id="upBtn">⬆ Up</button><button class="ghost" id="mkBtn">+ Folder</button><button class="ghost" id="urlBtn">Fetch URLs</button><button class="ghost" id="addBtn">+ Upload</button></div>
         <input type="file" id="file" accept="image/*" multiple>
       </div>
+      <div id="inCrumb" class="crumb" style="margin:8px 0 0"></div>
       <textarea id="urls" placeholder="Paste image URL(s), one per line" style="margin-top:10px"></textarea>
       <div class="imgs" id="imgs"></div>
     </div>
@@ -342,11 +428,96 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
     <div class="card">
       <div class="row">
         <label style="margin:0"><input type="checkbox" id="headless"> headless (no window)</label>
+        <label style="margin:0">Browser
+          <select id="browser" style="width:auto;min-width:130px;margin-left:6px">
+            <option value="auto" selected>Auto</option>
+            <option value="chrome">Chrome</option>
+            <option value="chromium">Chromium</option>
+          </select>
+        </label>
+        <button class="ghost" id="loginBtn">Login in Chrome first</button>
         <button class="run" id="run">Run on selected images</button>
         <span id="status" class="sub"></span>
       </div>
+      <div class="row" style="margin-top:10px">
+        <label style="margin:0">Caption <input id="socialCaption" type="text" placeholder="Optional burned-in caption"></label>
+        <label style="margin:0">Brand <input id="socialBrand" type="text" placeholder="Optional brand text"></label>
+      </div>
       <pre id="log" style="margin-top:14px;display:none"></pre>
       <div class="results" id="results"></div>
+    </div>
+  </div>
+  <div id="cardsView" style="display:none">
+    <div class="head"><h1>Intro / Outro Cards</h1><p class="sub">Render standalone branded cards with layout/background controls.</p></div>
+    <div class="card">
+      <div class="field">
+        <div class="lab">Layout presets (visual)</div>
+        <div class="presetGrid" id="layoutPresets">
+          <button class="preset" data-for="cardLayout" data-value="classic"><div class="ttl">Classic</div><div class="pvMini classic"><div class="logo"></div><div class="line t"></div><div class="line sub"></div></div></button>
+          <button class="preset" data-for="cardLayout" data-value="center"><div class="ttl">Center</div><div class="pvMini center"><div class="logo"></div><div class="line t"></div><div class="line sub"></div></div></button>
+          <button class="preset" data-for="cardLayout" data-value="lower-third"><div class="ttl">Lower Third</div><div class="pvMini lower-third"><div class="logo"></div><div class="line t"></div><div class="line sub"></div></div></button>
+          <button class="preset" data-for="cardLayout" data-value="split"><div class="ttl">Split</div><div class="pvMini split"><div class="logo"></div><div class="line t"></div><div class="line sub"></div></div></button>
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <div class="lab">Background style (visual)</div>
+        <div class="presetGrid" id="bgPresets">
+          <button class="preset" data-for="cardBg" data-value="gradient"><div class="ttl">Gradient</div><div class="pvMini"></div></button>
+          <button class="preset" data-for="cardBg" data-value="solid"><div class="ttl">Solid</div><div class="pvMini solid"></div></button>
+          <button class="preset" data-for="cardBg" data-value="image"><div class="ttl">Image</div><div class="pvMini image"></div></button>
+        </div>
+      </div>
+      <select id="cardLayout" style="display:none"><option value="classic">Classic</option><option value="center">Center</option><option value="lower-third">Lower Third</option><option value="split">Split</option></select>
+      <select id="cardBg" style="display:none"><option value="gradient">Gradient</option><option value="solid">Solid</option><option value="image">Image</option></select>
+      <div class="two">
+        <div class="field"><div class="lab">Solid color (hex)</div><input id="cardBgColor" type="text" value="14294a"></div>
+        <div class="field"><div class="lab">Background image path</div><input id="cardBgImage" type="text" placeholder="assets/your-image.jpg"></div>
+      </div>
+      <div class="two">
+        <div class="field"><div class="lab">Audience preset</div><select id="audiencePreset">
+          <option value="general">General marketing</option>
+          <option value="designer">Textile / fashion designer</option>
+          <option value="agency">Design agency / studio</option>
+          <option value="print">Print house / production</option>
+          <option value="brand">Brand / e-commerce team</option>
+          <option value="freelancer">Freelancer / solo creator</option>
+          <option value="enterprise">Enterprise / operations team</option>
+        </select></div>
+        <div class="field"><div class="lab">Preset tone</div><select id="presetTone">
+          <option value="premium">Premium</option>
+          <option value="bold">Bold</option>
+          <option value="minimal">Minimal</option>
+        </select></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="ghost" id="applyPreset">Apply messaging preset</button>
+        <span class="sub">Fills intro/outro title + subtitle for the selected audience.</span>
+      </div>
+      <div class="two">
+        <div class="field"><div class="lab">Intro title</div><input id="introTitle" type="text" value="Textile Designer AI"></div>
+        <div class="field"><div class="lab">Intro subtitle</div><input id="introSubtitle" type="text" value="AI tools for textile & fashion design"></div>
+      </div>
+      <div class="two">
+        <div class="field"><div class="lab">Outro title</div><input id="outroTitle" type="text" value="Visit textile-designer.ai"></div>
+        <div class="field"><div class="lab">Outro subtitle</div><input id="outroSubtitle" type="text" value="Start creating today"></div>
+      </div>
+      <div class="row">
+        <label class="inline">Intro sec <input id="introSec" type="number" step="0.1" value="3"></label>
+        <label class="inline">Outro sec <input id="outroSec" type="number" step="0.1" value="3.6"></label>
+        <label style="margin:0"><input type="checkbox" id="cardLogo" checked> show logo</label>
+        <label style="margin:0"><input type="checkbox" id="cardSocial"> social cuts</label>
+        <button class="run" id="runCards">Render intro/outro</button>
+        <span id="cardsStatus" class="sub"></span>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <div class="lab">Live preview</div>
+        <div class="two">
+          <div id="introPreview" class="cardPreview grad classic"><div class="lg"></div><div class="tx t">Textile Designer AI</div><div class="tx s">AI tools for textile & fashion design</div></div>
+          <div id="outroPreview" class="cardPreview grad classic"><div class="lg"></div><div class="tx t">Visit textile-designer.ai</div><div class="tx s">Start creating today</div></div>
+        </div>
+      </div>
+      <pre id="cardsLog" style="margin-top:14px;display:none"></pre>
+      <div class="results" id="cardsResults"></div>
     </div>
   </div>
   <div id="historyView" style="display:none">
@@ -360,16 +531,96 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
   </main>
 </div>
 <script>
-const $=s=>document.querySelector(s); let images=[]; const sel=new Set();
+const $=s=>document.querySelector(s); let images=[]; const sel=new Set(); let inPath='';
+const COPY_PRESETS={
+  general:{
+    premium:{intro:['Textile Designer AI','Create production-ready visuals in minutes'],outro:['Visit textile-designer.ai','AI tools for textile and fashion teams']},
+    bold:{intro:['From idea to print-ready fast','AI-powered textile design workflow'],outro:['Ship better designs faster','Start at textile-designer.ai']},
+    minimal:{intro:['Textile Designer AI','Design faster with AI'],outro:['textile-designer.ai','Try it today']}
+  },
+  designer:{
+    premium:{intro:['For Textile Designers','From concept to print-ready quality'],outro:['Design with speed and control','Create at textile-designer.ai']},
+    bold:{intro:['Stop fixing low-res art manually','Upscale, clean, and recolor in seconds'],outro:['Design more, edit less','Start now at textile-designer.ai']},
+    minimal:{intro:['For Textile Designers','Print-ready in seconds'],outro:['textile-designer.ai','Built for daily design work']}
+  },
+  agency:{
+    premium:{intro:['For Design Studios','Deliver polished client options faster'],outro:['Win approvals sooner','Scale at textile-designer.ai']},
+    bold:{intro:['More client variations, less turnaround','AI workflows for studio teams'],outro:['Ship campaigns faster','Visit textile-designer.ai']},
+    minimal:{intro:['For Agencies','Faster iterations, cleaner output'],outro:['textile-designer.ai','Ready for client delivery']}
+  },
+  print:{
+    premium:{intro:['For Print & Production Teams','Consistent quality before press'],outro:['Reduce rework and delays','Operate with textile-designer.ai']},
+    bold:{intro:['No more blurry customer artwork','Auto-fix for print in seconds'],outro:['Keep production moving','Start at textile-designer.ai']},
+    minimal:{intro:['For Print Teams','Cleaner files, faster approvals'],outro:['textile-designer.ai','Built for production']}
+  },
+  brand:{
+    premium:{intro:['For Brand and E-commerce Teams','Launch more collections with consistent visuals'],outro:['Scale brand creative output','Try textile-designer.ai']},
+    bold:{intro:['Create campaign-ready assets fast','AI tools for modern brand teams'],outro:['Move from brief to publish faster','Visit textile-designer.ai']},
+    minimal:{intro:['For Brand Teams','More assets, less effort'],outro:['textile-designer.ai','Start creating now']}
+  },
+  freelancer:{
+    premium:{intro:['For Freelancers','Deliver premium quality at freelance speed'],outro:['Win more projects with faster delivery','Start at textile-designer.ai']},
+    bold:{intro:['Turn one concept into many outputs','AI-powered workflow for solo creators'],outro:['Create, iterate, deliver','Visit textile-designer.ai']},
+    minimal:{intro:['For Freelancers','Fast edits, pro results'],outro:['textile-designer.ai','Built for solo creators']}
+  },
+  enterprise:{
+    premium:{intro:['For Enterprise Teams','Standardized quality across design operations'],outro:['Scale creative operations','Explore textile-designer.ai']},
+    bold:{intro:['Automate repetitive design production','AI workflows for high-volume teams'],outro:['Increase throughput with consistency','Start at textile-designer.ai']},
+    minimal:{intro:['For Enterprise Teams','Consistent output at scale'],outro:['textile-designer.ai','Designed for operations']}
+  },
+};
+function applyAudiencePreset(){
+  const a=$('#audiencePreset').value||'general';
+  const t=$('#presetTone').value||'premium';
+  const p=(COPY_PRESETS[a]&&COPY_PRESETS[a][t])||COPY_PRESETS.general.premium;
+  $('#introTitle').value=p.intro[0];
+  $('#introSubtitle').value=p.intro[1];
+  $('#outroTitle').value=p.outro[0];
+  $('#outroSubtitle').value=p.outro[1];
+  renderCardPreview();
+}
+function syncPresetButtons(groupId, selectId){
+  const val=$(selectId).value;
+  document.querySelectorAll(groupId+' .preset').forEach(b=>b.classList.toggle('on', b.dataset.value===val));
+}
+function renderCardPreview(){
+  const layout=$('#cardLayout').value, bg=$('#cardBg').value, showLogo=$('#cardLogo').checked;
+  const map={gradient:'grad',solid:'solid',image:'image'};
+  const apply=(id,title,sub)=>{
+    const el=$(id); if(!el) return;
+    el.className='cardPreview '+(map[bg]||'grad')+' '+layout;
+    el.querySelector('.tx.t').textContent=title;
+    el.querySelector('.tx.s').textContent=sub;
+    const lg=el.querySelector('.lg'); if(lg) lg.style.display=showLogo?'':'none';
+  };
+  apply('#introPreview',$('#introTitle').value||'Intro Title',$('#introSubtitle').value||'Intro subtitle');
+  apply('#outroPreview',$('#outroTitle').value||'Outro Title',$('#outroSubtitle').value||'Outro subtitle');
+}
 async function load(){
   const r=await (await fetch('/api/list')).json();
   $('#script').innerHTML=r.scripts.map(s=>'<option value="'+s.file+'">'+s.name+'</option>').join('');
   images=r.images;
   $('#target').innerHTML='<option value="">(none)</option>'+images.map(p=>'<option>'+p+'</option>').join('');
-  renderImgs();
+  browseInputs('');
+  document.querySelectorAll('.preset').forEach((b)=>b.onclick=()=>{const tgt='#'+b.dataset.for;$(tgt).value=b.dataset.value;syncPresetButtons('#layoutPresets','#cardLayout');syncPresetButtons('#bgPresets','#cardBg');renderCardPreview();});
+  ['#cardLayout','#cardBg','#introTitle','#introSubtitle','#outroTitle','#outroSubtitle','#cardLogo'].forEach((id)=>$(id).addEventListener('input',renderCardPreview));
+  $('#applyPreset').onclick=applyAudiencePreset;
+  $('#audiencePreset').onchange=applyAudiencePreset;
+  $('#presetTone').onchange=applyAudiencePreset;
+  syncPresetButtons('#layoutPresets','#cardLayout');
+  syncPresetButtons('#bgPresets','#cardBg');
+  applyAudiencePreset();
+  renderCardPreview();
 }
-function renderImgs(){
-  $('#imgs').innerHTML=images.map(p=>{
+function drawInputCrumbs(){
+  const parts=inPath?inPath.split('/'):[];
+  let acc='', html='<a data-p="">🏠 assets</a>';
+  parts.forEach((seg,i)=>{acc=acc?acc+'/'+seg:seg;const last=i===parts.length-1;html+='<span class="sep">›</span>'+(last?'<span class="here">'+seg+'</span>':'<a data-p="'+acc+'">'+seg+'</a>');});
+  $('#inCrumb').innerHTML=html;
+  document.querySelectorAll('#inCrumb a').forEach(a=>a.onclick=()=>browseInputs(a.dataset.p||''));
+}
+function renderImgs(list=[]){
+  $('#imgs').innerHTML=list.map(p=>{
     const on=sel.has(p);
     return '<div class="thumb'+(on?' sel':'')+'" data-p="'+p+'"><div class="ck">'+(on?'✓':'')+'</div>'+
       '<img src="/file/'+encodeURIComponent(p)+'"><div class="nm">'+p.split('/').pop()+'</div></div>';
@@ -377,47 +628,100 @@ function renderImgs(){
   document.querySelectorAll('.thumb').forEach(t=>t.onclick=()=>{const p=t.dataset.p;sel.has(p)?sel.delete(p):sel.add(p);renderImgs();upd();});
   upd();
 }
+async function browseInputs(p=''){
+  inPath=p||'';
+  const r=await (await fetch('/api/input-browse?p='+encodeURIComponent(inPath))).json();
+  drawInputCrumbs();
+  const files=(r.files||[]).map(f=>f.path);
+  const folders=(r.dirs||[]).map(d=>'<div class="thumb" data-d="'+d.path+'" title="'+d.count+' images"><div class="ck" style="opacity:1;background:#2f6fed;color:#fff;border-color:#2f6fed">📁</div><img src="/file/assets/logo-main.png"><div class="nm">'+d.name+' ('+d.count+')</div></div>');
+  const imgs=files.map(p=>{const on=sel.has(p);return '<div class="thumb'+(on?' sel':'')+'" data-p="'+p+'"><div class="ck">'+(on?'✓':'')+'</div><img src="/file/'+encodeURIComponent(p)+'"><div class="nm">'+p.split('/').pop()+'</div></div>'});
+  $('#imgs').innerHTML=[...folders,...imgs].join('');
+  document.querySelectorAll('.thumb[data-d]').forEach(t=>t.onclick=()=>browseInputs(t.dataset.d));
+  document.querySelectorAll('.thumb[data-p]').forEach(t=>t.onclick=()=>{const p=t.dataset.p;sel.has(p)?sel.delete(p):sel.add(p);browseInputs(inPath);upd();});
+  upd();
+}
 function upd(){$('#selcount').textContent=sel.size?('· '+sel.size+' selected'):'';$('#run').disabled=!sel.size;}
+$('#upBtn').onclick=()=>{if(!inPath)return;const p=inPath.split('/');p.pop();browseInputs(p.join('/'));};
+$('#mkBtn').onclick=async()=>{
+  const name=prompt('New folder name');
+  if(!name)return;
+  const r=await (await fetch('/api/input-mkdir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parent:inPath,name})})).json();
+  if(!r.ok&&r.error) alert(r.error);
+  browseInputs(inPath);
+};
 $('#addBtn').onclick=()=>$('#file').click();
 $('#file').onchange=async e=>{
   for(const f of e.target.files){
     const b64=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.readAsDataURL(f);});
-    const r=await (await fetch('/api/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:f.name,b64})})).json();
+    const uploadDir=inPath||'uploads';
+    const r=await (await fetch('/api/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:f.name,b64,dir:uploadDir})})).json();
     if(r.path){images.push(r.path);sel.add(r.path);}
   }
   $('#target').innerHTML='<option value="">(none)</option>'+images.map(p=>'<option>'+p+'</option>').join('');
-  renderImgs();
+  browseInputs(inPath);
 };
 $('#urlBtn').onclick=async()=>{
   const urls=$('#urls').value.split(/\\s+/).map(s=>s.trim()).filter(Boolean);
   if(!urls.length)return;
   $('#urlBtn').disabled=true;$('#urlBtn').textContent='Fetching…';
   try{
-    const r=await (await fetch('/api/fetch-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({urls})})).json();
+    const fetchDir=inPath||'uploads';
+    const r=await (await fetch('/api/fetch-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({urls,dir:fetchDir})})).json();
     (r.paths||[]).forEach(p=>{if(!images.includes(p))images.push(p);sel.add(p);});
     if(r.errors&&r.errors.length)alert('Could not fetch:\\n'+r.errors.join('\\n'));
     $('#urls').value='';
     $('#target').innerHTML='<option value="">(none)</option>'+images.map(p=>'<option>'+p+'</option>').join('');
-    renderImgs();
+    browseInputs(inPath);
   }catch(e){alert('Fetch failed: '+e);}
   $('#urlBtn').disabled=false;$('#urlBtn').textContent='Fetch URLs';
 };
+$('#loginBtn').onclick=async()=>{
+  const site=$('#site').value;
+  const r=await (await fetch('/api/login-chrome?site='+encodeURIComponent(site))).json();
+  if(!r.ok) alert(r.error||'Could not open Chrome');
+};
 $('#run').onclick=()=>{
-  const script=$('#script').value, imgs=[...sel].join(','), headless=$('#headless').checked?'1':'', target=$('#target').value, site=$('#site').value;
+  const script=$('#script').value, imgs=[...sel].join(','), headless=$('#headless').checked?'1':'', target=$('#target').value, site=$('#site').value, browser=$('#browser').value;
+  const socialCaption=$('#socialCaption').value||'';
+  const socialBrand=$('#socialBrand').value||'';
   $('#log').style.display='block';$('#log').textContent='';$('#results').innerHTML='';$('#run').disabled=true;$('#status').textContent='running…';
-  const es=new EventSource('/run?script='+encodeURIComponent(script)+'&images='+encodeURIComponent(imgs)+'&headless='+headless+'&target='+encodeURIComponent(target)+'&site='+site);
+  const es=new EventSource('/run?script='+encodeURIComponent(script)+'&images='+encodeURIComponent(imgs)+'&headless='+headless+'&target='+encodeURIComponent(target)+'&site='+site+'&browser='+encodeURIComponent(browser)+'&socialCaption='+encodeURIComponent(socialCaption)+'&socialBrand='+encodeURIComponent(socialBrand));
   es.addEventListener('log',e=>{const l=JSON.parse(e.data).line;$('#log').textContent+=l+'\\n';$('#log').scrollTop=$('#log').scrollHeight;});
   es.addEventListener('video',e=>{const v=JSON.parse(e.data).path;$('#results').innerHTML+='<a href="/file/'+encodeURIComponent(v)+'" target="_blank">▶ '+v.split('/').pop()+'</a>';});
   es.addEventListener('done',e=>{es.close();$('#run').disabled=false;$('#status').textContent='done';browse(histPath);});
 };
+$('#runCards').onclick=()=>{
+  const p=new URLSearchParams({
+    CARD_LAYOUT:$('#cardLayout').value,
+    CARD_BG:$('#cardBg').value,
+    CARD_BG_COLOR:($('#cardBgColor').value||'').trim(),
+    CARD_BG_IMAGE:($('#cardBgImage').value||'').trim(),
+    CARD_LOGO:$('#cardLogo').checked?'1':'0',
+    CARD_SOCIAL:$('#cardSocial').checked?'1':'0',
+    INTRO_TITLE:$('#introTitle').value||'',
+    INTRO_SUBTITLE:$('#introSubtitle').value||'',
+    INTRO_SEC:$('#introSec').value||'3',
+    OUTRO_TITLE:$('#outroTitle').value||'',
+    OUTRO_SUBTITLE:$('#outroSubtitle').value||'',
+    OUTRO_SEC:$('#outroSec').value||'3.6',
+  });
+  $('#cardsLog').style.display='block';$('#cardsLog').textContent='';$('#cardsResults').innerHTML='';$('#runCards').disabled=true;$('#cardsStatus').textContent='running…';
+  const es=new EventSource('/run-cards?'+p.toString());
+  es.addEventListener('log',e=>{const l=JSON.parse(e.data).line;$('#cardsLog').textContent+=l+'\\n';$('#cardsLog').scrollTop=$('#cardsLog').scrollHeight;});
+  es.addEventListener('video',e=>{const v=JSON.parse(e.data).path;$('#cardsResults').innerHTML+='<a href="/file/'+encodeURIComponent(v)+'" target="_blank">▶ '+v.split('/').pop()+'</a>';});
+  es.addEventListener('done',()=>{es.close();$('#runCards').disabled=false;$('#cardsStatus').textContent='done';browse(histPath);});
+};
 function tab(which){
   $('#tabRun').classList.toggle('on',which==='run');
+  $('#tabCards').classList.toggle('on',which==='cards');
   $('#tabHist').classList.toggle('on',which==='hist');
   $('#runView').style.display=which==='run'?'':'none';
+  $('#cardsView').style.display=which==='cards'?'':'none';
   $('#historyView').style.display=which==='hist'?'':'none';
   if(which==='hist')browse(histPath);
 }
 $('#tabRun').onclick=()=>tab('run');
+$('#tabCards').onclick=()=>tab('cards');
 $('#tabHist').onclick=()=>tab('hist');
 $('#histRefresh').onclick=()=>browse(histPath,histMode);
 $('#histMode').onclick=()=>browse(histPath,histMode==='flat'?'folders':'flat');
@@ -464,6 +768,7 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`)
   if (url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(HTML) }
   if (url.pathname === '/api/list') return sendJson(res, { scripts: listScripts(), images: listImages() })
+  if (url.pathname === '/api/input-browse') return sendJson(res, browseInputs(decodeURIComponent(url.searchParams.get('p') || '')))
   if (url.pathname === '/api/history') return sendJson(res, { videos: listHistory() })
   if (url.pathname === '/api/browse') return sendJson(res, browseDir(decodeURIComponent(url.searchParams.get('p') || ''), url.searchParams.get('flat') === '1'))
   if (url.pathname === '/api/open') {
@@ -478,6 +783,22 @@ const server = http.createServer((req, res) => {
       return sendJson(res, { ok: true })
     } catch (e) { return sendJson(res, { error: String(e) }, 500) }
   }
+  if (url.pathname === '/api/login-chrome') {
+    const site = url.searchParams.get('site') || 'prod'
+    const chrome = chromeExecutable()
+    if (!chrome) return sendJson(res, { ok: false, error: 'Chrome not found. Set CHROME_PATH and retry.' }, 400)
+    const isProd = site === 'prod'
+    const profileDir = path.join(DEMO_DIR, isProd ? '.profile-prod' : '.profile')
+    const openUrl = isProd ? 'https://textile-designer.ai/ai' : 'http://localhost:3000/ai'
+    try {
+      fs.mkdirSync(profileDir, { recursive: true })
+      const args = [`--user-data-dir=${profileDir}`, openUrl]
+      spawn(chrome, args, { detached: true, stdio: 'ignore' }).unref()
+      return sendJson(res, { ok: true })
+    } catch (e) {
+      return sendJson(res, { ok: false, error: String(e) }, 500)
+    }
+  }
   if (url.pathname === '/thumb') {
     const rel = decodeURIComponent(url.searchParams.get('p') || '')
     const abs = path.resolve(DEMO_DIR, rel)
@@ -491,10 +812,31 @@ const server = http.createServer((req, res) => {
     req.on('data', (c) => (body += c))
     req.on('end', () => {
       try {
-        const { name, b64 } = JSON.parse(body)
+        const { name, b64, dir = 'uploads' } = JSON.parse(body)
+        const relDir = String(dir).replace(/^[/\\]+/, '')
+        const targetDir = path.resolve(INPUT_ROOT, relDir)
+        if (!targetDir.startsWith(INPUT_ROOT)) return sendJson(res, { error: 'invalid dir' }, 400)
+        fs.mkdirSync(targetDir, { recursive: true })
         const fn = Date.now() + '-' + sanitize(name || 'upload.png')
-        fs.writeFileSync(path.join(UPLOADS, fn), Buffer.from(b64, 'base64'))
-        sendJson(res, { path: `assets/uploads/${fn}` })
+        fs.writeFileSync(path.join(targetDir, fn), Buffer.from(b64, 'base64'))
+        sendJson(res, { path: path.relative(DEMO_DIR, path.join(targetDir, fn)).replace(/\\/g, '/') })
+      } catch (e) { sendJson(res, { error: String(e) }, 400) }
+    })
+    return
+  }
+  if (url.pathname === '/api/input-mkdir' && req.method === 'POST') {
+    let body = ''
+    req.on('data', (c) => (body += c))
+    req.on('end', () => {
+      try {
+        const { parent = '', name = '' } = JSON.parse(body)
+        const safeName = sanitize(String(name || '').trim())
+        if (!safeName) return sendJson(res, { error: 'folder name required' }, 400)
+        const parentDir = path.resolve(INPUT_ROOT, String(parent || '').replace(/^[/\\]+/, ''))
+        if (!parentDir.startsWith(INPUT_ROOT)) return sendJson(res, { error: 'invalid parent' }, 400)
+        const dir = path.join(parentDir, safeName)
+        fs.mkdirSync(dir, { recursive: true })
+        sendJson(res, { ok: true, path: path.relative(INPUT_ROOT, dir).replace(/\\/g, '/') })
       } catch (e) { sendJson(res, { error: String(e) }, 400) }
     })
     return
@@ -504,8 +846,12 @@ const server = http.createServer((req, res) => {
     req.on('data', (c) => (body += c))
     req.on('end', async () => {
       try {
-        const { urls } = JSON.parse(body)
+        const { urls, dir = 'uploads' } = JSON.parse(body)
         const list = (Array.isArray(urls) ? urls : [urls]).filter(Boolean)
+        const relDir = String(dir).replace(/^[/\\]+/, '')
+        const targetDir = path.resolve(INPUT_ROOT, relDir)
+        if (!targetDir.startsWith(INPUT_ROOT)) return sendJson(res, { error: 'invalid dir' }, 400)
+        fs.mkdirSync(targetDir, { recursive: true })
         const paths = [], errors = []
         for (const u of list) {
           try {
@@ -518,8 +864,9 @@ const server = http.createServer((req, res) => {
             const ext = extFromType(ct) || (IMG_RE.test(urlName) ? urlName.match(IMG_RE)[0] : '.png')
             const base = urlName.replace(IMG_RE, '') || 'url-image'
             const fn = Date.now() + '-' + base + ext
-            fs.writeFileSync(path.join(UPLOADS, fn), buf)
-            paths.push(`assets/uploads/${fn}`)
+            const out = path.join(targetDir, fn)
+            fs.writeFileSync(out, buf)
+            paths.push(path.relative(DEMO_DIR, out).replace(/\\/g, '/'))
           } catch (e) { errors.push(`${u} -> ${e.message}`) }
         }
         sendJson(res, { paths, errors })
@@ -542,9 +889,18 @@ const server = http.createServer((req, res) => {
     const headless = url.searchParams.get('headless') === '1'
     const target = url.searchParams.get('target') || ''
     const site = url.searchParams.get('site') || 'dev'
+    const browser = url.searchParams.get('browser') || 'auto'
+    const socialCaption = url.searchParams.get('socialCaption') || ''
+    const socialBrand = url.searchParams.get('socialBrand') || ''
     const siteEnv = site === 'prod'
       ? { BASE_URL: 'https://textile-designer.ai', PROFILE: path.join(DEMO_DIR, '.profile-prod') }
       : {}
+    // Browser selection priority:
+    // 1) explicit UI choice
+    // 2) auto mode defaults to chrome on prod, otherwise inherit current env
+    const browserEnv = browser === 'chrome' || browser === 'chromium'
+      ? { BROWSER: browser }
+      : (site === 'prod' ? { BROWSER: 'chrome' } : {})
     // Forward intro/outro card options (from the Intro/Outro tab) as env vars.
     const cardEnv = {}
     for (const k of CARD_ENV_KEYS) { const v = url.searchParams.get(k); if (v !== null && v !== '') cardEnv[k] = v }
@@ -560,7 +916,20 @@ const server = http.createServer((req, res) => {
       send('log', { line: `\n=== ${script}  ←  ${img}  (run_${runId}) ===` })
       const child = spawn(process.execPath, [path.join(DEMO_DIR, script)], {
         cwd: DEMO_DIR,
-        env: { ...process.env, ...siteEnv, ...cardEnv, INPUT: img, DEMO_SUFFIX: suffix, DEMO_RUN_ID: runId, ...(target ? { TARGET: target } : {}), ...(headless ? { HEADLESS: '1' } : {}) },
+        env: {
+          ...process.env,
+          ...siteEnv,
+          ...browserEnv,
+          ...fontEnv(),
+          ...cardEnv,
+          INPUT: img,
+          DEMO_SUFFIX: suffix,
+          DEMO_RUN_ID: runId,
+          SOCIAL_CAPTION: socialCaption,
+          SOCIAL_BRAND: socialBrand,
+          ...(target ? { TARGET: target } : {}),
+          ...(headless ? { HEADLESS: '1' } : {}),
+        },
       })
       const onData = (buf) => buf.toString().split(/\r?\n/).forEach((l) => {
         if (!l) return
@@ -573,6 +942,30 @@ const server = http.createServer((req, res) => {
       child.on('close', (code) => { send('log', { line: `[exit ${code}]` }); runOne(i + 1) })
     }
     runOne(0)
+    return
+  }
+  if (url.pathname === '/run-cards') {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
+    const send = (ev, obj) => res.write(`event: ${ev}\ndata: ${JSON.stringify(obj)}\n\n`)
+    const cardEnv = {}
+    for (const k of CARD_ENV_KEYS) { const v = url.searchParams.get(k); if (v !== null && v !== '') cardEnv[k] = v }
+    send('log', { line: '\n=== record-intro-outro.mjs ===' })
+    const child = spawn(process.execPath, [path.join(DEMO_DIR, 'record-intro-outro.mjs')], {
+      cwd: DEMO_DIR,
+      env: { ...process.env, ...fontEnv(), ...cardEnv },
+    })
+    const onData = (buf) => buf.toString().split(/\r?\n/).forEach((l) => {
+      if (!l) return
+      send('log', { line: l })
+      const m = l.match(/VIDEO:\s*(.+\.mp4)\s*$/)
+      if (m) {
+        const rel = path.relative(DEMO_DIR, m[1].trim()).replace(/\\/g, '/')
+        send('video', { path: rel })
+      }
+    })
+    child.stdout.on('data', onData)
+    child.stderr.on('data', onData)
+    child.on('close', (code) => { send('log', { line: `[exit ${code}]` }); send('done', {}); res.end() })
     return
   }
   res.writeHead(404); res.end('not found')

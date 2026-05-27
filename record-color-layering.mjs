@@ -12,6 +12,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createDemoSession, finalizeVideo, sleep } from './lib/demo-kit.mjs'
+import { openPsdInPhotopea } from './lib/photopea.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
@@ -20,7 +21,7 @@ const MANUAL_LAYERS = process.env.LAYERS || '5'
 
 async function main() {
   const s = await createDemoSession({ dirName: 'color-layering' })
-  const { ctx, page, glide, fakeUpload, zoomEl, downloads, dir, t0, viewport } = s
+  const { ctx, page, glide, fakeUpload, zoomEl, downloads, dir, t0, viewport, rp } = s
   const spans = []
 
   const banner = async (text, color = '#2f6fed') => {
@@ -93,38 +94,17 @@ async function main() {
     await runOnce('manual')
     await clearBanner()
 
-    // Open Photopea and drop the PSD to reveal the editable layers.
+    // Photopea: Start using Photopea -> Open from computer -> captured PSD.
     const psd = [...downloads].reverse().find((f) => /\.psd$/i.test(f)) || downloads[downloads.length - 1]
     if (psd && fs.existsSync(psd)) {
-      const b64 = fs.readFileSync(psd).toString('base64')
-      const psdName = path.basename(psd)
-      // Photopea's editor lives at /?... — go straight there (skips the marketing
-      // landing) and use the Live Messaging API: postMessage the PSD as an
-      // ArrayBuffer and Photopea opens it directly (synthetic drag-drop is not
-      // trusted, so it never worked). Photopea posts back "done" when loaded.
-      await page.goto('https://www.photopea.com/', { waitUntil: 'domcontentloaded' })
-      await page.waitForFunction(() => !!(window.Photopea || (window.app && window.app.open)), null, { timeout: 20000 }).catch(() => {})
-      await sleep(3000) // let the editor finish booting
-      await banner('Opening the PSD in Photopea - layers preserved', '#2f7d54')
-      const opened = await page.evaluate(async ({ b64 }) => {
-        const bin = atob(b64)
-        const buf = new ArrayBuffer(bin.length)
-        const view = new Uint8Array(buf)
-        for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i)
-        return await new Promise((resolve) => {
-          let settled = false
-          const onMsg = (e) => {
-            if (e.data === 'done' && !settled) { settled = true; window.removeEventListener('message', onMsg); resolve(true) }
-          }
-          window.addEventListener('message', onMsg)
-          window.postMessage(buf, '*') // Photopea opens the file from the ArrayBuffer
-          setTimeout(() => { if (!settled) { settled = true; window.removeEventListener('message', onMsg); resolve(false) } }, 15000)
-        })
-      }, { b64 }).catch((e) => { console.log('photopea open failed:', e.message); return false })
-      console.log('[color_layering] photopea open ->', opened ? 'loaded' : 'no done signal (check screenshot)')
-      await sleep(3000) // let the layers panel paint
-      await clearBanner()
-      await page.screenshot({ path: path.join(dir, 'color-layering-photopea.png') }).catch(() => {})
+      const opened = await openPsdInPhotopea(page, psd, {
+        glide,
+        sleep,
+        onBanner: banner,
+        clearBanner,
+        screenshotPath: path.join(rp.outputs, 'color-layering-photopea.png'),
+      })
+      console.log('[color_layering] photopea ->', opened ? 'opened' : 'check screenshot')
     } else {
       console.log('[color_layering] no PSD captured - skipping Photopea step')
     }
