@@ -64,15 +64,60 @@ async function main() {
     await sleep(1800)
     await zoomEl(['canvas'])
 
-    // Run 1: Automatic detection (default on)
+    // The "Automatic color layer detection" switch is the second NextUI Switch
+    // on the panel (the first is Advanced-Q Mode). spec.default is FALSE for
+    // isAutomatic, so we MUST tick it before the auto run - the old "default on"
+    // comment was wrong, both runs were silently going through cluster_number
+    // mode. Read aria-checked to decide whether to toggle.
+    const findAutomaticSwitch = async () => {
+      // Scope by the label text, then grab the switch role inside the same row.
+      // Falls back to the second switch on the page if scoping fails.
+      const labelLoc = page.getByText(/automatic color layer detection/i).first()
+      const labelHandle = await labelLoc.elementHandle().catch(() => null)
+      if (labelHandle) {
+        const sw = await page.evaluateHandle((el) => {
+          let n = el
+          for (let i = 0; i < 6 && n; i++) {
+            const s = n.querySelector?.('[role="switch"]')
+            if (s) return s
+            n = n.parentElement
+          }
+          // Last resort: second switch on the page (after Advanced-Q Mode).
+          return document.querySelectorAll('[role="switch"]')[1] || null
+        }, labelHandle).catch(() => null)
+        if (sw) return page.locator('[role="switch"]').nth(await page.evaluate((s) => Array.from(document.querySelectorAll('[role="switch"]')).indexOf(s), sw).catch(() => 1))
+      }
+      return page.locator('[role="switch"]').nth(1)
+    }
+    const isAutomaticOn = async () => {
+      const sw = await findAutomaticSwitch()
+      const ac = await sw.getAttribute('aria-checked').catch(() => null)
+      return ac === 'true'
+    }
+    const setAutomatic = async (want, label) => {
+      const sw = await findAutomaticSwitch()
+      for (let i = 0; i < 3; i++) {
+        const on = await isAutomaticOn()
+        if (on === want) return true
+        await glide(sw).catch(() => {})
+        await sleep(500)
+      }
+      const finalOn = await isAutomaticOn()
+      console.log(`[color_layering] ${label}: isAutomatic=${finalOn} (wanted ${want})`)
+      return finalOn === want
+    }
+
+    // Run 1: Automatic detection - flip the switch ON if it isn't already.
     await banner('Automatic color layer detection', '#2f6fed')
+    await setAutomatic(true, 'pre-auto')
+    await sleep(400)
     await runOnce('automatic')
     await clearBanner()
 
-    // Run 2: Manual - turn automatic off and set a layer count
+    // Run 2: Manual - flip the switch OFF, then set the cluster count.
     await banner(`Manual - ${MANUAL_LAYERS} color layers`, '#2f6fed')
-    await glide(page.getByText(/automatic color layer detection/i).first()).catch(() => {})
-    await sleep(700)
+    await setAutomatic(false, 'pre-manual')
+    await sleep(500)
     const layerInput = page.locator('input[type="number"], input[inputmode="numeric"]').first()
     if (await layerInput.count().catch(() => 0)) {
       await layerInput.fill(String(MANUAL_LAYERS)).catch(() => {})
