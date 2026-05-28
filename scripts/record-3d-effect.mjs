@@ -1,6 +1,6 @@
 // 3D Effect - turn a flat design into 3D with depth/shadows/emboss.
 // Needs the api_worker (three_d_effect) on DEV/prod.
-import { recordTool } from './lib/demo-kit.mjs'
+import { recordTool } from '../lib/demo-kit.mjs'
 
 recordTool({
   tabId: 'three_d_effect',

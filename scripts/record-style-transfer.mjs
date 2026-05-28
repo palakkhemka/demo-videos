@@ -17,14 +17,14 @@
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { createDemoSession, finalizeVideo, sleep } from './lib/demo-kit.mjs'
+import { createDemoSession, finalizeVideo, sleep } from '../lib/demo-kit.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
-const INPUT = path.resolve(__dirname, process.env.INPUT || 'assets/input.jpg')
+const INPUT = path.resolve(__dirname, '..', process.env.INPUT || 'assets/input.jpg')
 // Style reference for the image-to-image mode. No dedicated asset ships, so
 // fall back to the same design as INPUT when TARGET is not provided.
-const TARGET = path.resolve(__dirname, process.env.TARGET || process.env.INPUT || 'assets/input.jpg')
+const TARGET = path.resolve(__dirname, '..', process.env.TARGET || process.env.INPUT || 'assets/input.jpg')
 // A single sensible creativity value (percent). The live tab currently keeps
 // the creativity control commented out, so this is applied opportunistically
 // (only if a % number box is actually rendered) and otherwise left at default.

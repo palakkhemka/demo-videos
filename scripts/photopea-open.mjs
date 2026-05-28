@@ -10,8 +10,8 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
-import { finalizeVideo, sleep } from './lib/demo-kit.mjs'
-import { createPageBanner, demoColorLayeringInPhotopea, sortDownloadsPsds } from './lib/photopea.mjs'
+import { finalizeVideo, sleep } from '../lib/demo-kit.mjs'
+import { createPageBanner, demoColorLayeringInPhotopea, sortDownloadsPsds } from '../lib/photopea.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const HEADLESS = process.env.HEADLESS === '1'
@@ -21,7 +21,7 @@ const LAYERS = Number(process.env.LAYERS || '5')
 function resolveRunDir() {
   const raw = process.env.RUN_DIR
   if (!raw) return null
-  let d = path.resolve(__dirname, raw)
+  let d = path.resolve(__dirname, '..', raw)
   if (path.basename(d).toLowerCase() === 'outputs') d = path.dirname(d)
   if (path.basename(d).toLowerCase() === 'input') d = path.dirname(d)
   return fs.existsSync(d) ? d : null
@@ -65,8 +65,8 @@ function resolveInputs() {
     console.log('[photopea-test] run dir:', runDir)
     return { autoPsd: psds[0], manualPsd: psds[1], outDir: path.join(runDir, 'outputs') }
   }
-  const autoPsd = process.env.INPUT ? path.resolve(__dirname, process.env.INPUT) : defaultPsd()
-  const manualPsd = process.env.INPUT2 ? path.resolve(__dirname, process.env.INPUT2) : null
+  const autoPsd = process.env.INPUT ? path.resolve(__dirname, '..', process.env.INPUT) : defaultPsd()
+  const manualPsd = process.env.INPUT2 ? path.resolve(__dirname, '..', process.env.INPUT2) : null
   return { autoPsd, manualPsd, outDir: path.join(__dirname, 'output', 'photopea-test') }
 }
 

@@ -9,11 +9,11 @@
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { createDemoSession, finalizeVideo, sleep } from './lib/demo-kit.mjs'
+import { createDemoSession, finalizeVideo, sleep } from '../lib/demo-kit.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
-const INPUT = path.resolve(__dirname, process.env.INPUT || 'assets/input.jpg')
+const INPUT = path.resolve(__dirname, '..', process.env.INPUT || 'assets/input.jpg')
 // Four runs: each scale at low and high creativity, so the demo shows both the
 // scale-factor and creativity controls. Creativity is a percent (range 10-70).
 const RUNS = [

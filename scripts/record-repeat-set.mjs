@@ -12,14 +12,14 @@ import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
-import { createDemoSession, makeSocialCuts, sleep, stamp, runPaths } from './lib/demo-kit.mjs'
-import { FONTS } from './config.mjs'
-import { renderCard } from './lib/cards.mjs'
+import { createDemoSession, makeSocialCuts, sleep, stamp, runPaths } from '../lib/demo-kit.mjs'
+import { FONTS } from '../config.mjs'
+import { renderCard } from '../lib/cards.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
 const HEADLESS = process.env.HEADLESS === '1'
-const INPUT = path.resolve(__dirname, process.env.INPUT || 'assets/input.jpg')
+const INPUT = path.resolve(__dirname, '..', process.env.INPUT || 'assets/input.jpg')
 const OUT = process.env.OUT || path.join(__dirname, 'output')
 const FFMPEG = path.join(__dirname, 'node_modules', 'ffmpeg-static', 'ffmpeg.exe')
 const VIEWPORT = { width: 1920, height: 1080 }

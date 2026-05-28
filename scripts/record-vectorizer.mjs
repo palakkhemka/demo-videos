@@ -23,7 +23,7 @@
 //     demo and recordTool does not expose download capture anyway.
 //
 // Usage: node record-vectorizer.mjs   (leave the window alone)
-import { recordTool } from './lib/demo-kit.mjs'
+import { recordTool } from '../lib/demo-kit.mjs'
 
 recordTool({
   tabId: 'vectorizer',

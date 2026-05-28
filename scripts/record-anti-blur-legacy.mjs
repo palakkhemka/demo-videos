@@ -2,7 +2,7 @@
 // Workflow: clean start -> pick Legacy model -> upload blurry image -> zoom input
 // -> submit -> result -> before/after slider (if present) -> zoom result.
 // Needs the anti_blur worker running on DEV.
-import { recordTool } from './lib/demo-kit.mjs'
+import { recordTool } from '../lib/demo-kit.mjs'
 
 recordTool({
   tabId: 'anti_blur',

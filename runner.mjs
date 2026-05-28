@@ -169,22 +169,30 @@ const SCRIPT_NAMES = {
   'record-anti-blur-pro.mjs': 'Anti-Blur · Pro',
   'record-anti-blur-legacy.mjs': 'Anti-Blur · Legacy',
   'record-upscale.mjs': 'Ready to Print (2× & 4×)',
+  'record-super-scaler.mjs': 'Super Scaler',
+  'record-super-scaler-scale-compare.mjs': 'Super Scaler · 2×/4×/8× compare',
   'record-vectorizer.mjs': 'Vectorizer',
   'record-dress-to-design-advanced.mjs': 'Dress to Design · Advanced',
   'record-dress-to-design-fine.mjs': 'Dress to Design · Fine Detail',
+  'record-design-extension.mjs': 'Design Extension (compass)',
   'record-color-transfer.mjs': 'Color Transfer',
   'record-color-layering.mjs': 'Color Layering (+ Photopea)',
   'record-repeat-set.mjs': 'Repeat Set (+ seamless proof)',
   'record-repeat-checker.mjs': 'Seamless Checker',
   'record-embroidery.mjs': 'Embroidery Effect',
   'record-3d-effect.mjs': '3D Effect',
+  'record-border-outline.mjs': 'Border Outline',
+  'record-watermark-removal.mjs': 'Watermark Removal',
+  'record-fabric-texture-removal.mjs': 'Scanned Fabric Texture Removal',
 }
 const prettyName = (f) =>
   SCRIPT_NAMES[f] || f.replace(/^record-/, '').replace(/\.mjs$/, '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
+const SCRIPTS_DIR = path.join(DEMO_DIR, 'scripts')
+
 const listScripts = () =>
   // record-intro-outro is driven by its own Intro/Outro tab, not the tool runner.
-  fs.readdirSync(DEMO_DIR).filter((f) => /^record-.*\.mjs$/.test(f) && f !== 'record-intro-outro.mjs').sort()
+  fs.readdirSync(SCRIPTS_DIR).filter((f) => /^record-.*\.mjs$/.test(f) && f !== 'record-intro-outro.mjs').sort()
     .map((f) => ({ file: f, name: prettyName(f) }))
 
 // Option env keys forwarded from query string to the spawned script (intro/outro).
@@ -914,7 +922,7 @@ const server = http.createServer((req, res) => {
       const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')
       const runId = suffix ? `${ts}-${suffix}` : ts
       send('log', { line: `\n=== ${script}  ←  ${img}  (run_${runId}) ===` })
-      const child = spawn(process.execPath, [path.join(DEMO_DIR, script)], {
+      const child = spawn(process.execPath, [path.join(SCRIPTS_DIR, script)], {
         cwd: DEMO_DIR,
         env: {
           ...process.env,
@@ -950,7 +958,7 @@ const server = http.createServer((req, res) => {
     const cardEnv = {}
     for (const k of CARD_ENV_KEYS) { const v = url.searchParams.get(k); if (v !== null && v !== '') cardEnv[k] = v }
     send('log', { line: '\n=== record-intro-outro.mjs ===' })
-    const child = spawn(process.execPath, [path.join(DEMO_DIR, 'record-intro-outro.mjs')], {
+    const child = spawn(process.execPath, [path.join(SCRIPTS_DIR, 'record-intro-outro.mjs')], {
       cwd: DEMO_DIR,
       env: { ...process.env, ...fontEnv(), ...cardEnv },
     })

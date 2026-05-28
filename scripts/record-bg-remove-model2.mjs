@@ -1,5 +1,5 @@
 // Background Removal (bg_remove) using Model 2. Needs the GPU bg_remove worker.
-import { recordTool } from './lib/demo-kit.mjs'
+import { recordTool } from '../lib/demo-kit.mjs'
 
 recordTool({
   tabId: 'bg_remove',

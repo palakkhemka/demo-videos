@@ -13,8 +13,8 @@ import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
-import { runPaths, stamp } from './lib/demo-kit.mjs'
-import { FONTS } from './config.mjs'
+import { runPaths, stamp } from '../lib/demo-kit.mjs'
+import { FONTS } from '../config.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'

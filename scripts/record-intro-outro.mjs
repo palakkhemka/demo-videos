@@ -15,16 +15,16 @@
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { renderCard } from './lib/cards.mjs'
-import { makeSocialCuts, runPaths } from './lib/demo-kit.mjs'
-import { FONT_PATHS } from './config.mjs'
+import { renderCard } from '../lib/cards.mjs'
+import { makeSocialCuts, runPaths } from '../lib/demo-kit.mjs'
+import { FONT_PATHS } from '../config.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const env = (k, d) => (process.env[k] !== undefined && process.env[k] !== '' ? process.env[k] : d)
 
 const layout = env('CARD_LAYOUT', 'classic')
 const bg = env('CARD_BG', 'gradient')
-const bgImage = env('CARD_BG_IMAGE', '') ? path.resolve(__dirname, env('CARD_BG_IMAGE')) : ''
+const bgImage = env('CARD_BG_IMAGE', '') ? path.resolve(__dirname, '..', env('CARD_BG_IMAGE')) : ''
 const bgColor = env('CARD_BG_COLOR', '14294a')
 const showLogo = env('CARD_LOGO', '1') !== '0'
 const social = env('CARD_SOCIAL', '0') === '1'

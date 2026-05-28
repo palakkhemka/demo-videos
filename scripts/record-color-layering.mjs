@@ -10,12 +10,12 @@
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { createDemoSession, finalizeVideo, sleep } from './lib/demo-kit.mjs'
-import { createPageBanner, demoColorLayeringInPhotopea, sortDownloadsPsds } from './lib/photopea.mjs'
+import { createDemoSession, finalizeVideo, sleep } from '../lib/demo-kit.mjs'
+import { createPageBanner, demoColorLayeringInPhotopea, sortDownloadsPsds } from '../lib/photopea.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
-const INPUT = path.resolve(__dirname, process.env.INPUT || 'assets/input.jpg')
+const INPUT = path.resolve(__dirname, '..', process.env.INPUT || 'assets/input.jpg')
 const MANUAL_LAYERS = process.env.LAYERS || '5'
 
 async function main() {

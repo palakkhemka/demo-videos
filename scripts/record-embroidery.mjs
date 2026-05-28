@@ -1,6 +1,6 @@
 // Embroidery Effect - turn a design into realistic embroidery.
 // Needs the api_worker (embroidery_effect) on DEV/prod.
-import { recordTool } from './lib/demo-kit.mjs'
+import { recordTool } from '../lib/demo-kit.mjs'
 
 recordTool({
   tabId: 'embroidery_effect',

@@ -13,7 +13,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { chromium } from 'playwright-core'
 import { recordPage } from 'testreel'
-import { runPaths, stamp } from './lib/demo-kit.mjs'
+import { runPaths, stamp } from '../lib/demo-kit.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 

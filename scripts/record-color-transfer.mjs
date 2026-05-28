@@ -14,17 +14,17 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createDemoSession, finalizeVideo, sleep } from './lib/demo-kit.mjs'
+import { createDemoSession, finalizeVideo, sleep } from '../lib/demo-kit.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
-const SOURCE = path.resolve(__dirname, process.env.INPUT || 'assets/input.jpg')
+const SOURCE = path.resolve(__dirname, '..', process.env.INPUT || 'assets/input.jpg')
 // Fall back to SOURCE if env TARGET is unset or its file does not exist - the
 // previous default (assets/colors-target.jpg) is not in the repo, which made
 // fakeUpload's fs.readFileSync throw and aborted the whole recording before
 // finalizeVideo could run.
 const targetCandidate = process.env.TARGET
-  ? path.resolve(__dirname, process.env.TARGET)
+  ? path.resolve(__dirname, '..', process.env.TARGET)
   : ''
 const TARGET = targetCandidate && fs.existsSync(targetCandidate) ? targetCandidate : SOURCE
 

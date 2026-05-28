@@ -50,11 +50,11 @@ output videos. Outputs land in `output/<tool>/`.
 
 ```bash
 # dev
-node record-bg-remove2.mjs
+node scripts/record-bg-remove2.mjs
 # prod, custom input (bash)
-BASE_URL=https://textile-designer.ai PROFILE=.profile-prod INPUT=assets/input.jpg node record-bg-remove2.mjs
+BASE_URL=https://textile-designer.ai PROFILE=.profile-prod INPUT=assets/input.jpg node scripts/record-bg-remove2.mjs
 # dev/prod on bundled Chromium instead of Chrome
-BROWSER=chromium node record-bg-remove2.mjs
+BROWSER=chromium node scripts/record-bg-remove2.mjs
 ```
 
 ## Configuration
@@ -77,12 +77,19 @@ All in `config.mjs`, overridable by env var:
 
 ## Tools
 
-`record-bg-remove2.mjs` (Background Removal), `record-anti-blur-pro/-legacy.mjs`,
-`record-upscale.mjs` (2× & 4×), `record-vectorizer.mjs`,
-`record-dress-to-design-advanced/-fine.mjs`, `record-color-transfer.mjs`,
-`record-color-layering.mjs` (+ Photopea), `record-embroidery.mjs`,
-`record-3d-effect.mjs`, `record-repeat-set.mjs` (+ seamless-checker proof),
-`record-repeat-checker.mjs`.
+All recorder scripts live under `scripts/`:
+
+`record-bg-remove2.mjs` (Background Removal · Model 1), `record-bg-remove-model2.mjs`
+(Model 2), `record-anti-blur-pro/-legacy.mjs`, `record-upscale.mjs` (2× & 4×),
+`record-super-scaler.mjs` + `record-super-scaler-scale-compare.mjs` (2×/4×/8×),
+`record-vectorizer.mjs`, `record-dress-to-design-advanced/-fine.mjs`,
+`record-color-transfer.mjs`, `record-color-layering.mjs` (+ Photopea via
+`scripts/photopea-open.mjs`), `record-embroidery.mjs`, `record-3d-effect.mjs`,
+`record-repeat-set.mjs` (+ seamless-checker proof), `record-repeat-checker.mjs`,
+`record-design-extension.mjs` (4 directions × 2 creativity → compass outro),
+`record-border-outline.mjs`, `record-watermark-removal.mjs`,
+`record-fabric-texture-removal.mjs`, `record-style-transfer.mjs`,
+`record-intro-outro.mjs` (intro/outro card renderer).
 
 Each tool runs against the site's real worker, so its worker must be live (prod
 workers always are). Runs spend real credits on the logged-in org.
@@ -96,7 +103,7 @@ font env vars to TTF paths **without spaces**, e.g.:
 FONT_REGULAR=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf \
 FONT_BOLD=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf \
 FONT_SYMBOL=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf \
-node record-bg-remove2.mjs
+node scripts/record-bg-remove2.mjs
 ```
 
 ## Notes
