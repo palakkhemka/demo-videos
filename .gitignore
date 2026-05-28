@@ -6,7 +6,9 @@ node_modules/
 # Generated videos/screenshots and uploaded inputs
 output/
 *.log
-# Only the brand logos are tracked; sample/user inputs are not.
+# Only the brand logos + UI preview frames are tracked; sample/user inputs are not.
 assets/*
 !assets/logo-main.png
 !assets/logo-scientia.png
+!assets/template-previews/
+!assets/template-previews/**

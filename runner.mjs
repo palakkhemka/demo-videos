@@ -196,7 +196,23 @@ const listScripts = () =>
     .map((f) => ({ file: f, name: prettyName(f) }))
 
 // Option env keys forwarded from query string to the spawned script (intro/outro).
-const CARD_ENV_KEYS = ['CARD_LAYOUT', 'CARD_BG', 'CARD_BG_IMAGE', 'CARD_BG_COLOR', 'CARD_LOGO', 'CARD_SOCIAL', 'INTRO_TITLE', 'INTRO_SUBTITLE', 'INTRO_SEC', 'OUTRO_TITLE', 'OUTRO_SUBTITLE', 'OUTRO_SEC']
+const CARD_ENV_KEYS = [
+  // Shared template / layout / background / logo / social
+  'CARD_TEMPLATE', 'CARD_LAYOUT', 'CARD_BG', 'CARD_BG_IMAGE', 'CARD_BG_COLOR', 'CARD_LOGO', 'CARD_SOCIAL',
+  // Per-card text (intro + outro)
+  'INTRO_TITLE', 'INTRO_SUBTITLE', 'INTRO_SEC', 'INTRO_CTA',
+  'OUTRO_TITLE', 'OUTRO_SUBTITLE', 'OUTRO_SEC', 'OUTRO_CTA',
+  // editorial
+  'CARD_KICKER', 'CARD_ISSUE', 'CARD_DATE',
+  // case-study
+  'CARD_INPUT_IMG', 'CARD_OUTPUT_IMG', 'CARD_ACTION', 'CARD_METRIC',
+  // reel-hook
+  'CARD_PUNCHLINE',
+  // trade-show
+  'CARD_TOOLS', 'CARD_BOOTH',
+  // process-strip
+  'CARD_STEPS', 'CARD_ACTIVE_STEP',
+]
 const fontEnv = () => ({
   FONT_REGULAR: FONT_PATHS.ui,
   FONT_BOLD: FONT_PATHS.uib,
@@ -388,6 +404,25 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
   .pvMini.center .line.t{top:34px}.pvMini.center .line.sub{top:46px}
   .pvMini.lower-third .line.t{top:52px}.pvMini.lower-third .line.sub{top:63px}
   .pvMini.split .line.t{top:26px;left:55%}.pvMini.split .line.sub{top:38px;left:55%}
+  /* Modal for the in-Tool template picker. */
+  .tplModal{position:fixed;inset:0;z-index:2147483600}
+  .tplModal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+  .tplModal-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(1080px,92vw);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+  .tplModal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .tplModal-head h2{margin:0;font-size:18px}
+  .tplGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:10px}
+  .tplCard{background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:10px;cursor:pointer;transition:.12s}
+  .tplCard:hover{border-color:var(--acc)}
+  .tplCard.on{border-color:var(--acc);box-shadow:0 0 0 2px rgba(91,214,160,.22)}
+  .tplCard .ttl{font-size:13px;font-weight:700;margin-bottom:6px}
+  .tplCard .sub{font-size:11px;color:var(--mut);margin-top:6px;line-height:1.35}
+  .tplCard .thumb{height:120px;border-radius:8px;overflow:hidden;background:#10141a;display:flex;align-items:center;justify-content:center}
+  .tplCard .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .tplExtrasWrap{margin-top:14px}
+  .tplExtrasWrap .field{margin-bottom:8px}
+  .tplExtrasWrap .field .lab{font-size:11px;color:var(--mut);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+  .tplExtrasWrap input{width:100%}
+  .tplExtrasWrap .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .cardPreview{height:160px;border-radius:12px;border:1px solid var(--line2);position:relative;overflow:hidden}
   .cardPreview.grad{background:linear-gradient(145deg,#14294a,#2f6a4a)}
   .cardPreview.solid{background:#26425b}
@@ -444,6 +479,7 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
           </select>
         </label>
         <button class="ghost" id="loginBtn">Login in Chrome first</button>
+        <button class="ghost" id="pickIntroOutroBtn" type="button">🎬 Intro / Outro · <span id="pickedTplLabel">Classic</span></button>
         <button class="run" id="run">Run on selected images</button>
         <span id="status" class="sub"></span>
       </div>
@@ -455,16 +491,40 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
       <div class="results" id="results"></div>
     </div>
   </div>
+  <!-- Intro / Outro template picker modal. Lives outside the runView / cardsView
+       blocks so it can be triggered from the Tool tab and dismisses on backdrop
+       click or the Cancel button. -->
+  <div id="tplModal" class="tplModal" style="display:none">
+    <div class="tplModal-backdrop"></div>
+    <div class="tplModal-panel">
+      <div class="tplModal-head">
+        <h2>Choose intro / outro template</h2>
+        <button class="ghost" id="tplModalClose" type="button">Close ✕</button>
+      </div>
+      <p class="sub" style="margin:0 0 10px">Each option wraps every recorded clip with that intro and outro. Pick one, then run as usual.</p>
+      <div class="tplGrid" id="tplGrid"></div>
+      <div class="tplExtrasWrap" id="tplModalExtras"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:14px;gap:10px">
+        <button class="ghost" id="tplModalCancel" type="button">Cancel</button>
+        <button class="run" id="tplModalApply" type="button">Use this template</button>
+      </div>
+    </div>
+  </div>
   <div id="cardsView" style="display:none">
     <div class="head"><h1>Intro / Outro Cards</h1><p class="sub">Render standalone branded cards with layout/background controls.</p></div>
     <div class="card">
       <div class="field">
-        <div class="lab">Layout presets (visual)</div>
+        <div class="lab">Template (intro &amp; outro)</div>
         <div class="presetGrid" id="layoutPresets">
           <button class="preset" data-for="cardLayout" data-value="classic"><div class="ttl">Classic</div><div class="pvMini classic"><div class="logo"></div><div class="line t"></div><div class="line sub"></div></div></button>
           <button class="preset" data-for="cardLayout" data-value="center"><div class="ttl">Center</div><div class="pvMini center"><div class="logo"></div><div class="line t"></div><div class="line sub"></div></div></button>
           <button class="preset" data-for="cardLayout" data-value="lower-third"><div class="ttl">Lower Third</div><div class="pvMini lower-third"><div class="logo"></div><div class="line t"></div><div class="line sub"></div></div></button>
           <button class="preset" data-for="cardLayout" data-value="split"><div class="ttl">Split</div><div class="pvMini split"><div class="logo"></div><div class="line t"></div><div class="line sub"></div></div></button>
+          <button class="preset" data-for="cardLayout" data-value="editorial"><div class="ttl">Editorial</div><div class="pvMini" style="background:#0c0e12;position:relative"><div style="position:absolute;left:6px;top:6px;width:50%;height:1px;background:#fff7"></div><div style="position:absolute;left:6px;top:14px;width:70%;height:8px;background:#fff"></div><div style="position:absolute;left:6px;bottom:6px;width:30%;height:2px;background:#fff7"></div></div></button>
+          <button class="preset" data-for="cardLayout" data-value="case-study"><div class="ttl">Case Study</div><div class="pvMini" style="background:#0c1117;position:relative"><div style="position:absolute;left:8px;top:14px;width:24%;height:60%;background:#bcd6c8"></div><div style="position:absolute;right:8px;top:14px;width:24%;height:60%;background:#3a4252"></div><div style="position:absolute;left:8px;bottom:6px;width:84%;height:6px;background:#5bd6a0"></div></div></button>
+          <button class="preset" data-for="cardLayout" data-value="reel-hook"><div class="ttl">Reel Hook</div><div class="pvMini" style="background:#0c0e12;position:relative;border:1px solid #5bd6a0"><div style="position:absolute;left:8px;right:8px;top:36%;height:10px;background:#fff"></div><div style="position:absolute;left:8px;right:8px;bottom:6px;height:4px;background:#5bd6a0"></div></div></button>
+          <button class="preset" data-for="cardLayout" data-value="trade-show"><div class="ttl">Trade Show</div><div class="pvMini" style="background:linear-gradient(120deg,#14294a,#5bd6a0);position:relative"><div style="position:absolute;left:8px;right:8px;top:18%;height:8px;background:#fff;margin:auto"></div><div style="position:absolute;left:8px;right:8px;top:50%;height:8px;background:#fff8"></div><div style="position:absolute;left:8px;right:8px;bottom:6px;height:4px;background:#fff"></div></div></button>
+          <button class="preset" data-for="cardLayout" data-value="process-strip"><div class="ttl">Process Strip</div><div class="pvMini" style="background:#14294a;position:relative"><div style="position:absolute;left:6px;right:6px;top:8px;height:6px;background:#fff"></div><div style="position:absolute;left:6px;top:50%;width:20%;height:30%;background:#5bd6a0"></div><div style="position:absolute;left:30%;top:50%;width:18%;height:30%;background:#fff3"></div><div style="position:absolute;left:54%;top:50%;width:18%;height:30%;background:#fff3"></div><div style="position:absolute;left:78%;top:50%;width:18%;height:30%;background:#fff3"></div></div></button>
         </div>
       </div>
       <div class="field" style="margin-top:10px">
@@ -475,7 +535,7 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
           <button class="preset" data-for="cardBg" data-value="image"><div class="ttl">Image</div><div class="pvMini image"></div></button>
         </div>
       </div>
-      <select id="cardLayout" style="display:none"><option value="classic">Classic</option><option value="center">Center</option><option value="lower-third">Lower Third</option><option value="split">Split</option></select>
+      <select id="cardLayout" style="display:none"><option value="classic">Classic</option><option value="center">Center</option><option value="lower-third">Lower Third</option><option value="split">Split</option><option value="editorial">Editorial</option><option value="case-study">Case Study</option><option value="reel-hook">Reel Hook</option><option value="trade-show">Trade Show</option><option value="process-strip">Process Strip</option></select>
       <select id="cardBg" style="display:none"><option value="gradient">Gradient</option><option value="solid">Solid</option><option value="image">Image</option></select>
       <div class="two">
         <div class="field"><div class="lab">Solid color (hex)</div><input id="cardBgColor" type="text" value="14294a"></div>
@@ -508,6 +568,47 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
       <div class="two">
         <div class="field"><div class="lab">Outro title</div><input id="outroTitle" type="text" value="Visit textile-designer.ai"></div>
         <div class="field"><div class="lab">Outro subtitle</div><input id="outroSubtitle" type="text" value="Start creating today"></div>
+      </div>
+      <div class="field tplExtras" data-tpls="editorial" style="margin-top:6px;display:none">
+        <div class="lab">Editorial extras</div>
+        <div class="two">
+          <div class="field"><input id="cardKicker" type="text" placeholder="Kicker (e.g. TEXTILE DESIGNER · TOOL 03)"></div>
+          <div class="field"><input id="cardIssue" type="text" placeholder="Issue (e.g. VOL 04 · NO 17)"></div>
+        </div>
+        <input id="cardDate" type="text" placeholder="Date (defaults to current month)" style="margin-top:6px">
+      </div>
+      <div class="field tplExtras" data-tpls="case-study" style="display:none">
+        <div class="lab">Case Study extras</div>
+        <div class="two">
+          <div class="field"><input id="cardInputImg" type="text" placeholder="Input image path (assets/...)"></div>
+          <div class="field"><input id="cardOutputImg" type="text" placeholder="Output image path (assets/... or leave blank for intro)"></div>
+        </div>
+        <div class="two" style="margin-top:6px">
+          <div class="field"><input id="cardAction" type="text" placeholder="Action label (e.g. Anti-Blur)"></div>
+          <div class="field"><input id="cardMetric" type="text" placeholder="Metric strip (e.g. 3 minutes · ready for print)"></div>
+        </div>
+      </div>
+      <div class="field tplExtras" data-tpls="reel-hook" style="display:none">
+        <div class="lab">Reel Hook extras</div>
+        <input id="cardPunchline" type="text" placeholder="Big punchline (e.g. Watermarks → gone.)">
+        <div class="two" style="margin-top:6px">
+          <div class="field"><input id="introCta" type="text" placeholder="Intro CTA (e.g. Watch what happens ↓)"></div>
+          <div class="field"><input id="outroCta" type="text" placeholder="Outro CTA (e.g. Try free → textile-designer.ai)"></div>
+        </div>
+      </div>
+      <div class="field tplExtras" data-tpls="trade-show" style="display:none">
+        <div class="lab">Trade Show extras</div>
+        <div class="two">
+          <div class="field"><input id="cardTools" type="text" placeholder="Tools (CSV: Anti-Blur,Vectorize,Color Match,Repeat Set)"></div>
+          <div class="field"><input id="cardBooth" type="text" placeholder="Booth + URL (e.g. Booth 312 · textile-designer.ai)"></div>
+        </div>
+      </div>
+      <div class="field tplExtras" data-tpls="process-strip" style="display:none">
+        <div class="lab">Process Strip extras</div>
+        <div class="two">
+          <div class="field"><input id="cardSteps" type="text" placeholder="Steps (CSV: Upload,Adjust,Submit,Export)"></div>
+          <div class="field"><input id="cardActiveStep" type="number" min="0" max="4" value="0" placeholder="Highlight index (0-based)"></div>
+        </div>
       </div>
       <div class="row">
         <label class="inline">Intro sec <input id="introSec" type="number" step="0.1" value="3"></label>
@@ -594,8 +695,20 @@ function syncPresetButtons(groupId, selectId){
 function renderCardPreview(){
   const layout=$('#cardLayout').value, bg=$('#cardBg').value, showLogo=$('#cardLogo').checked;
   const map={gradient:'grad',solid:'solid',image:'image'};
+  const NEW_TPLS=['editorial','case-study','reel-hook','trade-show','process-strip'];
   const apply=(id,title,sub)=>{
     const el=$(id); if(!el) return;
+    // For the new templates the CSS-only preview can't reproduce the ffmpeg
+    // output, so fall back to a rendered frame from assets/template-previews/.
+    if (NEW_TPLS.includes(layout)) {
+      el.className='cardPreview rendered';
+      el.innerHTML='<img src="/file/'+encodeURIComponent('assets/template-previews/'+layout+'.jpg')+'" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:6px">';
+      return;
+    }
+    // Legacy: reset structure if we'd swapped to <img> earlier, then class+text.
+    if (!el.querySelector('.tx.t')) {
+      el.innerHTML='<div class="lg"></div><div class="tx t"></div><div class="tx s"></div>';
+    }
     el.className='cardPreview '+(map[bg]||'grad')+' '+layout;
     el.querySelector('.tx.t').textContent=title;
     el.querySelector('.tx.s').textContent=sub;
@@ -610,7 +723,7 @@ async function load(){
   images=r.images;
   $('#target').innerHTML='<option value="">(none)</option>'+images.map(p=>'<option>'+p+'</option>').join('');
   browseInputs('');
-  document.querySelectorAll('.preset').forEach((b)=>b.onclick=()=>{const tgt='#'+b.dataset.for;$(tgt).value=b.dataset.value;syncPresetButtons('#layoutPresets','#cardLayout');syncPresetButtons('#bgPresets','#cardBg');renderCardPreview();});
+  document.querySelectorAll('.preset').forEach((b)=>b.onclick=()=>{const tgt='#'+b.dataset.for;$(tgt).value=b.dataset.value;syncPresetButtons('#layoutPresets','#cardLayout');syncPresetButtons('#bgPresets','#cardBg');renderCardPreview();showTplExtras();});
   ['#cardLayout','#cardBg','#introTitle','#introSubtitle','#outroTitle','#outroSubtitle','#cardLogo'].forEach((id)=>$(id).addEventListener('input',renderCardPreview));
   $('#applyPreset').onclick=applyAudiencePreset;
   $('#audiencePreset').onchange=applyAudiencePreset;
@@ -619,6 +732,36 @@ async function load(){
   syncPresetButtons('#bgPresets','#cardBg');
   applyAudiencePreset();
   renderCardPreview();
+  showTplExtras();
+}
+// Show only the "Template extras" panel matching the currently selected template.
+function showTplExtras(){
+  const tpl=$('#cardLayout').value;
+  document.querySelectorAll('.tplExtras').forEach((el)=>{
+    const tpls=(el.getAttribute('data-tpls')||'').split(',');
+    el.style.display=tpls.includes(tpl)?'':'none';
+  });
+}
+// Collect every CARD_* / INTRO_* / OUTRO_* value from the Intro/Outro tab. Reused
+// by both the tool run and the standalone intro/outro render so the template
+// chosen in the UI wraps every output the runner produces.
+function collectCardParams(){
+  const v=(id)=>{const el=$(id);return el?(el.type==='checkbox'?(el.checked?'1':'0'):(el.value||'')):'';};
+  const layout=v('#cardLayout');
+  return {
+    CARD_TEMPLATE:layout, CARD_LAYOUT:layout,
+    CARD_BG:v('#cardBg'), CARD_BG_COLOR:v('#cardBgColor'), CARD_BG_IMAGE:v('#cardBgImage'),
+    CARD_LOGO:v('#cardLogo'), CARD_SOCIAL:v('#cardSocial'),
+    INTRO_TITLE:v('#introTitle'), INTRO_SUBTITLE:v('#introSubtitle'), INTRO_SEC:v('#introSec'),
+    OUTRO_TITLE:v('#outroTitle'), OUTRO_SUBTITLE:v('#outroSubtitle'), OUTRO_SEC:v('#outroSec'),
+    INTRO_CTA:v('#introCta'), OUTRO_CTA:v('#outroCta'),
+    CARD_KICKER:v('#cardKicker'), CARD_ISSUE:v('#cardIssue'), CARD_DATE:v('#cardDate'),
+    CARD_INPUT_IMG:v('#cardInputImg'), CARD_OUTPUT_IMG:v('#cardOutputImg'),
+    CARD_ACTION:v('#cardAction'), CARD_METRIC:v('#cardMetric'),
+    CARD_PUNCHLINE:v('#cardPunchline'),
+    CARD_TOOLS:v('#cardTools'), CARD_BOOTH:v('#cardBooth'),
+    CARD_STEPS:v('#cardSteps'), CARD_ACTIVE_STEP:v('#cardActiveStep'),
+  };
 }
 function drawInputCrumbs(){
   const parts=inPath?inPath.split('/'):[];
@@ -693,26 +836,15 @@ $('#run').onclick=()=>{
   const socialCaption=$('#socialCaption').value||'';
   const socialBrand=$('#socialBrand').value||'';
   $('#log').style.display='block';$('#log').textContent='';$('#results').innerHTML='';$('#run').disabled=true;$('#status').textContent='running…';
-  const es=new EventSource('/run?script='+encodeURIComponent(script)+'&images='+encodeURIComponent(imgs)+'&headless='+headless+'&target='+encodeURIComponent(target)+'&site='+site+'&browser='+encodeURIComponent(browser)+'&socialCaption='+encodeURIComponent(socialCaption)+'&socialBrand='+encodeURIComponent(socialBrand));
+  const card=collectCardParams();
+  const cardQs=Object.entries(card).filter(([,v])=>v!=='').map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
+  const es=new EventSource('/run?script='+encodeURIComponent(script)+'&images='+encodeURIComponent(imgs)+'&headless='+headless+'&target='+encodeURIComponent(target)+'&site='+site+'&browser='+encodeURIComponent(browser)+'&socialCaption='+encodeURIComponent(socialCaption)+'&socialBrand='+encodeURIComponent(socialBrand)+(cardQs?'&'+cardQs:''));
   es.addEventListener('log',e=>{const l=JSON.parse(e.data).line;$('#log').textContent+=l+'\\n';$('#log').scrollTop=$('#log').scrollHeight;});
   es.addEventListener('video',e=>{const v=JSON.parse(e.data).path;$('#results').innerHTML+='<a href="/file/'+encodeURIComponent(v)+'" target="_blank">▶ '+v.split('/').pop()+'</a>';});
   es.addEventListener('done',e=>{es.close();$('#run').disabled=false;$('#status').textContent='done';browse(histPath);});
 };
 $('#runCards').onclick=()=>{
-  const p=new URLSearchParams({
-    CARD_LAYOUT:$('#cardLayout').value,
-    CARD_BG:$('#cardBg').value,
-    CARD_BG_COLOR:($('#cardBgColor').value||'').trim(),
-    CARD_BG_IMAGE:($('#cardBgImage').value||'').trim(),
-    CARD_LOGO:$('#cardLogo').checked?'1':'0',
-    CARD_SOCIAL:$('#cardSocial').checked?'1':'0',
-    INTRO_TITLE:$('#introTitle').value||'',
-    INTRO_SUBTITLE:$('#introSubtitle').value||'',
-    INTRO_SEC:$('#introSec').value||'3',
-    OUTRO_TITLE:$('#outroTitle').value||'',
-    OUTRO_SUBTITLE:$('#outroSubtitle').value||'',
-    OUTRO_SEC:$('#outroSec').value||'3.6',
-  });
+  const p=new URLSearchParams(collectCardParams());
   $('#cardsLog').style.display='block';$('#cardsLog').textContent='';$('#cardsResults').innerHTML='';$('#runCards').disabled=true;$('#cardsStatus').textContent='running…';
   const es=new EventSource('/run-cards?'+p.toString());
   es.addEventListener('log',e=>{const l=JSON.parse(e.data).line;$('#cardsLog').textContent+=l+'\\n';$('#cardsLog').scrollTop=$('#cardsLog').scrollHeight;});
@@ -769,6 +901,96 @@ async function browse(p,mode){
   document.querySelectorAll('#hist .tile.folder').forEach(t=>t.onclick=()=>browse(t.dataset.p, histPath===''?'flat':histMode));
   document.querySelectorAll('#hist .tile[data-open]').forEach(t=>t.onclick=()=>fetch('/api/open?p='+t.dataset.open));
 }
+// ----- Template picker modal (Tool tab) -----------------------------------
+// Catalogue used by both the modal grid and the legacy Intro/Outro tab. Each
+// row has: id (matches CARD_TEMPLATE), nice label, one-line description, and
+// the per-template fields that the modal shows when that template is selected.
+const TPL_CATALOG=[
+  {id:'classic',     label:'Classic',       desc:'Centered logo with title + subtitle below — the default look.'},
+  {id:'center',      label:'Center',        desc:'Big centered title, small logo near the top. Clean and direct.'},
+  {id:'lower-third', label:'Lower Third',   desc:'Full-bleed background with the title in a boxed lower band.'},
+  {id:'split',       label:'Split',         desc:'Logo on the left, title + subtitle stacked on the right.'},
+  {id:'editorial',   label:'Editorial',     desc:'Magazine-cover layout for premium B2B. Full-bleed design + masthead.', extras:[
+    {id:'cardKicker',ph:'Kicker (e.g. TEXTILE DESIGNER · TOOL 03)'},
+    {id:'cardIssue', ph:'Issue (e.g. VOL 04 · NO 17)'},
+    {id:'cardDate',  ph:'Date (defaults to current month)'},
+  ]},
+  {id:'case-study',  label:'Case Study',    desc:'Input → action → output split for designer adoption pitches.', extras:[
+    {id:'cardInputImg', ph:'Input image path (assets/...)'},
+    {id:'cardOutputImg',ph:'Output image path (or blank for the intro placeholder)'},
+    {id:'cardAction',   ph:'Action label (e.g. Anti-Blur)'},
+    {id:'cardMetric',   ph:'Metric strip (e.g. 3 minutes · ready for print)'},
+  ]},
+  {id:'reel-hook',   label:'Reel Hook',     desc:'Big punch-line + CTA for Reels / TikTok / Shorts.', extras:[
+    {id:'cardPunchline',ph:'Big punch-line (e.g. Watermarks → gone.)'},
+    {id:'introCta',     ph:'Intro CTA (e.g. Watch what happens ↓)'},
+    {id:'outroCta',     ph:'Outro CTA (e.g. Try free → textile-designer.ai)'},
+  ]},
+  {id:'trade-show',  label:'Trade Show',    desc:'Booth-loop signage with tool list and footer URL.', extras:[
+    {id:'cardTools',ph:'Tools (CSV: Anti-Blur,Vectorize,Color Match,Repeat Set)'},
+    {id:'cardBooth',ph:'Booth + URL (e.g. Booth 312 · textile-designer.ai)'},
+  ]},
+  {id:'process-strip',label:'Process Strip',desc:'Numbered step strip for tutorial intros.', extras:[
+    {id:'cardSteps',     ph:'Steps (CSV: Upload,Adjust,Submit,Export)'},
+    {id:'cardActiveStep',ph:'Highlight index (0-based, default 0)'},
+  ]},
+];
+const NEW_TPLS=['editorial','case-study','reel-hook','trade-show','process-strip'];
+const TPL_KEY='demoRunner.template.v1';
+const tplState=(()=>{try{return JSON.parse(localStorage.getItem(TPL_KEY)||'{}')}catch(_){return{}}})();
+function tplSave(){try{localStorage.setItem(TPL_KEY,JSON.stringify(tplState))}catch(_){}}
+function tplThumbHtml(id){
+  if(NEW_TPLS.includes(id)) return '<img src="/file/'+encodeURIComponent('assets/template-previews/'+id+'.jpg')+'">';
+  // Legacy layouts: cheap CSS-only mini.
+  return '<div class="pvMini '+id+'" style="width:90%;height:90%"><div class="logo"></div><div class="line t"></div><div class="line sub"></div></div>';
+}
+function tplRenderGrid(){
+  const cur=tplState.template||'classic';
+  $('#tplGrid').innerHTML=TPL_CATALOG.map(t=>
+    '<div class="tplCard'+(cur===t.id?' on':'')+'" data-id="'+t.id+'">'+
+      '<div class="ttl">'+t.label+'</div>'+
+      '<div class="thumb">'+tplThumbHtml(t.id)+'</div>'+
+      '<div class="sub">'+t.desc+'</div>'+
+    '</div>'
+  ).join('');
+  document.querySelectorAll('#tplGrid .tplCard').forEach(c=>c.onclick=()=>{
+    tplState.template=c.dataset.id; tplRenderGrid(); tplRenderExtras();
+  });
+}
+function tplRenderExtras(){
+  const cur=tplState.template||'classic';
+  const t=TPL_CATALOG.find(x=>x.id===cur);
+  const ex=(t&&t.extras)||[];
+  if(!ex.length){$('#tplModalExtras').innerHTML=''; return}
+  const fields=ex.map(f=>
+    '<div class="field"><div class="lab">'+f.ph.split(' (')[0]+'</div><input id="tpl_'+f.id+'" type="text" placeholder="'+f.ph+'" value="'+(tplState[f.id]||'')+'"></div>'
+  ).join('');
+  $('#tplModalExtras').innerHTML='<div class="lab" style="margin-top:6px;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em">Template fields</div>'+
+    (ex.length>=2?'<div class="two">'+fields+'</div>':fields);
+  ex.forEach(f=>{const el=$('#tpl_'+f.id); if(el) el.oninput=()=>{tplState[f.id]=el.value; tplSave();};});
+}
+function tplLabelFor(id){const t=TPL_CATALOG.find(x=>x.id===id); return t?t.label:'Classic'}
+function tplApplyToHiddenInputs(){
+  // Mirror the modal's choices into the existing #cardLayout / #cardXxx inputs
+  // so the legacy Intro/Outro tab and collectCardParams() both see them.
+  const v=tplState.template||'classic';
+  if($('#cardLayout')) $('#cardLayout').value=v;
+  const ids=['cardKicker','cardIssue','cardDate','cardInputImg','cardOutputImg','cardAction','cardMetric','cardPunchline','introCta','outroCta','cardTools','cardBooth','cardSteps','cardActiveStep'];
+  ids.forEach(id=>{const el=$('#'+id); if(el && tplState[id]!==undefined) el.value=tplState[id]});
+  if($('#pickedTplLabel')) $('#pickedTplLabel').textContent=tplLabelFor(v);
+  if (typeof showTplExtras==='function') showTplExtras();
+  if (typeof renderCardPreview==='function') renderCardPreview();
+}
+function tplOpenModal(){tplRenderGrid(); tplRenderExtras(); $('#tplModal').style.display='block'}
+function tplCloseModal(){$('#tplModal').style.display='none'}
+$('#pickIntroOutroBtn').onclick=tplOpenModal;
+$('#tplModalClose').onclick=tplCloseModal;
+$('#tplModalCancel').onclick=tplCloseModal;
+document.querySelector('#tplModal .tplModal-backdrop').onclick=tplCloseModal;
+$('#tplModalApply').onclick=()=>{tplSave(); tplApplyToHiddenInputs(); tplCloseModal();};
+// Hydrate once on load (after the existing init has run).
+window.addEventListener('DOMContentLoaded',()=>{tplApplyToHiddenInputs()});
+
 load();
 </script></body></html>`
 
