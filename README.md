@@ -44,7 +44,17 @@ npm run runner        # → http://localhost:8787
 Pick **Target site** (dev/prod), a **script**, one or more **input images**
 (preset or uploaded), an optional **Target image** (for color_transfer), then
 **Run**. It runs the script on each image one-by-one, streams logs, and links the
-output videos. Outputs land in `output/<tool>/`.
+output videos. Outputs land in `output/<tool>/run_<id>/{input,outputs,videos}/`.
+
+#### Picking an intro/outro template
+
+Next to the Run button there's a **🎬 Intro / Outro · <label>** chip. Click it
+to open a modal with thumbnail tiles for every template (see [Templates](#introoutro-templates)).
+Pick one, fill the template-specific fields (kicker / punch-line / steps /
+etc.), apply, and every tool video you record afterwards gets wrapped with
+that intro and outro. The selection persists across page reloads via
+localStorage; the standalone **Intro / Outro Cards** tab can still render a
+single intro/outro pair on demand.
 
 ### Single script (CLI)
 
@@ -77,22 +87,49 @@ All in `config.mjs`, overridable by env var:
 
 ## Tools
 
-All recorder scripts live under `scripts/`:
+All recorder scripts live under `scripts/`. Each runs against the site's real
+worker, so its worker must be live (prod workers always are) and each run
+spends real credits on the logged-in org.
 
-`record-bg-remove2.mjs` (Background Removal · Model 1), `record-bg-remove-model2.mjs`
-(Model 2), `record-anti-blur-pro/-legacy.mjs`, `record-upscale.mjs` (2× & 4×),
-`record-super-scaler.mjs` + `record-super-scaler-scale-compare.mjs` (2×/4×/8×),
-`record-vectorizer.mjs`, `record-dress-to-design-advanced/-fine.mjs`,
-`record-color-transfer.mjs`, `record-color-layering.mjs` (+ Photopea via
-`scripts/photopea-open.mjs`), `record-embroidery.mjs`, `record-3d-effect.mjs`,
-`record-repeat-set.mjs` (+ seamless-checker proof), `record-repeat-checker.mjs`,
-`record-design-extension.mjs` (4 directions × 2 creativity → compass outro),
+**One-click tools (upload → submit → before/after slider):**
+`record-bg-remove2.mjs` (Background Removal · Model 1),
+`record-bg-remove-model2.mjs` (Model 2), `record-anti-blur-pro/-legacy.mjs`,
 `record-border-outline.mjs`, `record-watermark-removal.mjs`,
-`record-fabric-texture-removal.mjs`, `record-style-transfer.mjs`,
-`record-intro-outro.mjs` (intro/outro card renderer).
+`record-fabric-texture-removal.mjs`, `record-embroidery.mjs`,
+`record-3d-effect.mjs`.
 
-Each tool runs against the site's real worker, so its worker must be live (prod
-workers always are). Runs spend real credits on the logged-in org.
+**Multi-knob tools (one run, custom params):**
+`record-super-scaler.mjs` (Creative + Prism Shift + 4×),
+`record-vectorizer.mjs` (cycles PNG/EPS/SVG + Line Quality before submit),
+`record-dress-to-design-advanced/-fine.mjs`, `record-style-transfer.mjs`,
+`record-color-transfer.mjs` (source + target).
+
+**Multi-run / comparison tools:**
+- `record-upscale.mjs` — 2× & 4× × low/high creativity, ends in a 2×2 loupe-magnifier compare.
+- `record-super-scaler-scale-compare.mjs` — 2× / 4× / 8× on the same input, loupe compare.
+- `record-design-extension.mjs` — 4 directions × 2 creativity = 8 runs, ends with two 3×3 **compass** overlays (one per creativity) placing each directional output in its actual extension direction around the original.
+- `record-color-layering.mjs` — automatic vs manual color separation, then drives Photopea (via the embedded iframe in `scripts/photopea-open.mjs`) to peel each `Color_N` layer top-down.
+- `record-repeat-set.mjs` — Full / Half-Drop / Half-Brick, with `record-repeat-checker.mjs` for the seamless proof.
+
+**Card renderer:** `scripts/record-intro-outro.mjs` — pure ffmpeg, drives `lib/cards.mjs`. Called by the runner's `🎬 Intro / Outro` modal and by every tool recorder's `finalizeVideo` step.
+
+### Intro/Outro templates
+
+All 9 templates render through `lib/cards.mjs` and are selectable from the
+runner's modal (Tool tab) or the standalone Intro/Outro tab.
+
+| Template | Purpose | Key fields |
+|---|---|---|
+| `classic` / `center` / `lower-third` / `split` | Legacy logo + title + subtitle placements | `INTRO_TITLE`, `INTRO_SUBTITLE`, `OUTRO_TITLE`, `OUTRO_SUBTITLE` |
+| `editorial` | Magazine cover for premium B2B (full-bleed design image + masthead) | `CARD_KICKER`, `CARD_ISSUE`, `CARD_DATE`, `CARD_BG_IMAGE` |
+| `case-study` | Designer adoption: input → action pill → output split with metric strip | `CARD_INPUT_IMG`, `CARD_OUTPUT_IMG`, `CARD_ACTION`, `CARD_METRIC` |
+| `reel-hook` | Social-first punch-line + CTA for Reels / TikTok / Shorts | `CARD_PUNCHLINE`, `INTRO_CTA`, `OUTRO_CTA` |
+| `trade-show` | Booth-loop signage with tool list + booth/URL footer | `CARD_TOOLS` (CSV), `CARD_BOOTH` |
+| `process-strip` | Tutorial: numbered "01 → 02 → 03 → 04" step strip | `CARD_STEPS` (CSV), `CARD_ACTIVE_STEP` |
+
+When a tool video is wrapped, the template + its fields propagate from the
+runner to the recorder via env vars; see `CARD_ENV_KEYS` in `runner.mjs` and
+`buildCardOpts()` in `lib/demo-kit.mjs`.
 
 ## Fonts
 
@@ -108,6 +145,11 @@ node scripts/record-bg-remove2.mjs
 
 ## Notes
 
-- `assets/` holds sample inputs + the brand logo; `assets/uploads/`, `output/`,
+- `assets/` holds sample inputs + the brand logo + `template-previews/`
+  (rendered frames used by the runner UI modal). `assets/uploads/`, `output/`,
   `node_modules/`, and `.profile*/` are git-ignored.
 - ffmpeg ships via `ffmpeg-static` (bundled, no system install needed).
+- The runner UI HTML/CSS/JS lives inside a JS template literal in `runner.mjs`.
+  Mind escape collapsing when editing the inline `<script>` block: `\(` `\)`
+  `\d` `\.` all degrade to their bare form before the browser parses them.
+  Prefer split/substring over regex for short patterns inside that script.
